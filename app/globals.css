@@ -30,8 +30,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .login-actions{display:grid;gap:10px;margin-top:6px}
 .login-btn{width:100%;justify-content:center;padding:11px;min-height:42px}
 .login-or{text-align:center;color:var(--muted);font-size:11px}
-.btn.zoho-btn{background:#e42527;border-color:#e42527;color:#fff;box-shadow:0 4px 10px #e4252722}
-.btn.zoho-btn:hover{background:#c91f21;border-color:#c91f21;color:#fff}
+.btn.zoho-btn{background:#fff;border-color:#d9dfe9;color:#26344b;gap:10px}
+.btn.zoho-btn:hover{background:#f8f9fc;border-color:#e42527;color:#26344b}
 
 .pmenu{position:relative}
 .pmenu-panel{position:absolute;right:0;top:calc(100% + 9px);min-width:210px;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 32px #203d7020;padding:6px;z-index:8;display:grid}

@@ -53,10 +53,7 @@ export default function LoginPage() {
             <button className="btn primary login-btn">Sign in</button>
             <span className="login-or">or</span>
             <button type="button" className="btn login-btn zoho-btn" onClick={zoho}>
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                <rect width="24" height="24" rx="5" fill="#fff" />
-                <path d="M6 7h12l-8.5 10H18" fill="none" stroke="#e42527" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <Image src="/zoho-logo.png" alt="" width={46} height={25} style={{ width: 46, height: 'auto' }} />
               Sign in with Zoho
             </button>
           </div>
