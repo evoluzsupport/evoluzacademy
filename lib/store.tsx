@@ -2,8 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Kind, Me, State, Trainee, Trainer } from './types';
-import { makeSeed } from './seed';
-import { emptyState, loadRemote, myProfile, pushDiff, seedRemote } from './sync';
+import { emptyState, loadRemote, myProfile, pushDiff } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
@@ -145,12 +144,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           await supabase.auth.signOut();
           return;
         }
-        let state = await loadRemote();
-        if (!state.courses.length && p.role === 'admin') {
-          await seedRemote(makeSeed());
-          state = await loadRemote();
-        }
-        adopt(state);
+        adopt(await loadRemote());
         setRemoteMe({ kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined });
       } catch (e) {
         bootedFor.current = null;
