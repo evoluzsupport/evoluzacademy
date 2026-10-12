@@ -28,7 +28,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
     ],
     insights: [
       { href: '/analytics', label: 'Analytics', icon: '◔' },
-      { href: '/roles', label: 'Roles & access', icon: '⚿' },
+      { href: '/users', label: 'Users', icon: '⚿' },
     ],
   },
   trainer: {

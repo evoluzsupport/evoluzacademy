@@ -24,6 +24,15 @@ export interface SessionDraft {
   updateExisting: boolean;
 }
 
+export interface UserDraft {
+  name: string;
+  email: string;
+  phone: string;
+  access: Kind;
+  /** trainer's role/specialty, or a trainee's job role */
+  title: string;
+}
+
 export interface Ctx {
   ready: boolean;
   S: State;
@@ -49,6 +58,8 @@ export interface Ctx {
   removeCourse: (id: string) => void;
   removeTopic: (cid: string, topicId: string) => void;
   setRole: (id: string, role: Kind) => boolean;
+  saveUser: (id: string | null, u: UserDraft) => string | null;
+  removeUser: (id: string) => void;
   addPeople: (people: { name: string; email: string; role: Kind }[]) => { added: number; skipped: string[] };
   importCSV: (kind: ImportKind, file: File, courseId?: string) => Promise<void>;
 }
@@ -376,6 +387,61 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return true;
     };
 
+    // Create (id = null) or edit a user; returns an error message, or null on success.
+    const saveUser: Ctx['saveUser'] = (id, u) => {
+      const cur = S0.current;
+      const name = u.name.trim();
+      const email = u.email.trim().toLowerCase();
+      if (!name) return 'Please add a name';
+      if (!/^\S+@\S+\.\S+$/.test(email)) return 'Please add a valid email';
+      const all = [...cur.admins, ...cur.trainers, ...cur.trainees];
+      if (all.some((p) => p.id !== id && p.email.toLowerCase() === email)) return 'That email is already in use';
+      const was: Kind | null = !id ? null : cur.admins.some((a) => a.id === id) ? 'admin' : cur.trainers.some((t) => t.id === id) ? 'trainer' : 'trainee';
+      if (was === 'admin' && u.access !== 'admin' && cur.admins.length <= 1) return 'There must be at least one admin';
+      const prev = id ? (all.find((p) => p.id === id) as Partial<Trainer & Trainee> | undefined) : undefined;
+      const newId = id ?? uid(u.access === 'admin' ? 'ad-' : u.access === 'trainer' ? 'r-' : 't-');
+      update((s) => {
+        s.admins = s.admins.filter((p) => p.id !== newId);
+        s.trainers = s.trainers.filter((p) => p.id !== newId);
+        s.trainees = s.trainees.filter((p) => p.id !== newId);
+        const base = { id: newId, name, email, phone: u.phone.trim() || undefined, password: '' };
+        if (u.access === 'admin') s.admins.push(base);
+        else if (u.access === 'trainer')
+          s.trainers.push({ ...base, specialty: u.title.trim() || prev?.specialty || '', tone: prev?.tone ?? 'lilac' });
+        else
+          s.trainees.push({
+            ...base,
+            jobRole: u.title.trim() || prev?.jobRole || 'Trainee',
+            joined: prev?.joined ?? today(),
+            status: prev?.status ?? 'Active',
+            trainer: prev?.trainer ?? '',
+            tone: prev?.tone ?? 'lilac',
+          });
+        // keep name references in step when a trainer is renamed
+        if (prev && prev.name && prev.name !== name && was === 'trainer') {
+          s.courses.forEach((c) => { if (c.primaryTrainer === prev.name) c.primaryTrainer = name; });
+          s.trainees.forEach((t) => { if (t.trainer === prev.name) t.trainer = name; });
+          Object.values(s.progress).forEach((r) => { if (r.trainer === prev.name) r.trainer = name; });
+          s.sessions.forEach((x) => { if (x.trainer === prev.name) x.trainer = name; });
+        }
+      });
+      toast(id ? 'User updated' : 'User added');
+      return null;
+    };
+
+    const removeUser: Ctx['removeUser'] = (id) => {
+      const cur = S0.current;
+      if (cur.admins.some((a) => a.id === id) && cur.admins.length <= 1) return toast('There must be at least one admin');
+      update((s) => {
+        s.admins = s.admins.filter((p) => p.id !== id);
+        s.trainers = s.trainers.filter((p) => p.id !== id);
+        s.trainees = s.trainees.filter((p) => p.id !== id);
+        s.assignments = s.assignments.filter((a) => a.traineeId !== id);
+        for (const k of Object.keys(s.progress)) if (k.startsWith(id + '|')) delete s.progress[k];
+      });
+      toast('User removed');
+    };
+
     const addPeople: Ctx['addPeople'] = (people) => {
       const cur = S0.current;
       const taken = new Set([...cur.admins, ...cur.trainers, ...cur.trainees].map((p) => p.email.toLowerCase()).filter(Boolean));
@@ -402,7 +468,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return { added: fresh.length, skipped };
     };
 
-    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeTopic, importCSV, setRole, addPeople };
+    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update, toast]);
 

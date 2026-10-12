@@ -100,11 +100,11 @@ export function TrainerForm({ id }: { id?: string }) {
   return (
     <>
       <h2>{id ? 'Edit trainer' : 'Add trainer'}</h2>
-      <p>Maintain the trainer directory and areas of expertise. A trainer needs an email to sign in.</p>
+      <p>Maintain the trainer directory and each trainer's role. A trainer needs an email to sign in.</p>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Name"><input value={f.name} onChange={(e) => set('name', e.target.value)} required /></Field>
-          <Field label="Specialty"><input value={f.specialty} onChange={(e) => set('specialty', e.target.value)} /></Field>
+          <Field label="Role"><input value={f.specialty} onChange={(e) => set('specialty', e.target.value)} /></Field>
           <Field label="Email (login)"><input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
         </div>
         <FormActions onCancel={closeModal} />

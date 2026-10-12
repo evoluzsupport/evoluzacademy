@@ -49,7 +49,7 @@ export default function ProfilePage() {
                 <div className="field"><label>Joined on</label><input value={fmtDate(trainee.joined)} disabled readOnly /></div>
               </>
             )}
-            {trainer && <div className="field full"><label>Specialty</label><input value={trainer.specialty} disabled readOnly /></div>}
+            {trainer && <div className="field full"><label>Role</label><input value={trainer.specialty} disabled readOnly /></div>}
           </div>
           <div className="modal-actions"><button className="btn primary">Save changes</button></div>
         </form>

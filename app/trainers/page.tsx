@@ -42,7 +42,7 @@ export default function TrainersPage() {
           isAdmin && (
             <>
               <button className="btn" onClick={() => openModal(<ImportDialog kind="trainers" />)}>Import CSV</button>
-              <button className="btn" onClick={() => downloadCSV([['Name', 'Specialty', 'Email'], ...S.trainers.map((t) => [t.name, t.specialty, t.email])], 'evoluz-trainers.csv')}>Export CSV</button>
+              <button className="btn" onClick={() => downloadCSV([['Name', 'Role', 'Email'], ...S.trainers.map((t) => [t.name, t.specialty, t.email])], 'evoluz-trainers.csv')}>Export CSV</button>
               <button className="btn primary" onClick={() => openModal(<TrainerForm />)}>＋ Add trainer</button>
             </>
           )

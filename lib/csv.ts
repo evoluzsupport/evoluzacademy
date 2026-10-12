@@ -63,7 +63,7 @@ export type ImportKind = 'trainees' | 'trainers' | 'curriculum' | 'topics';
 
 export const TEMPLATE_COLUMNS: Record<ImportKind, string[]> = {
   trainees: ['Name', 'Email', 'Role', 'Joined', 'Status', 'Trainer', 'Courses'],
-  trainers: ['Name', 'Specialty', 'Email'],
+  trainers: ['Name', 'Role', 'Email'],
   curriculum: ['Course', 'Category', 'Duration', 'Primary Trainer', 'Planned day', 'Topic', 'What we cover', 'Activity / assessment', 'Topic Trainer'],
   topics: ['Course', 'Planned day', 'Topic', 'What we cover', 'Activity / assessment', 'Trainer'],
 };

@@ -49,7 +49,7 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
     for (const row of rows) {
       const name = field(row, 'Name', 'Trainer');
       if (!name) continue;
-      const specialty = field(row, 'Specialty');
+      const specialty = field(row, 'Role', 'Specialty');
       const email = field(row, 'Email');
       const existing = S.trainers.find((t) => lc(t.name) === lc(name));
       if (existing) {
