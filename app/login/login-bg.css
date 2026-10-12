@@ -1,0 +1,13 @@
+.login-wrap{position:relative;overflow:hidden;background:linear-gradient(120deg,#eef4fc,#dfe8f8,#e6f1fb,#eae7fb);background-size:300% 300%;animation:lg-shift 18s ease-in-out infinite}
+.login-box{position:relative;z-index:1}
+.lg-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lg-bg span{position:absolute;border-radius:50%;filter:blur(8px);opacity:.55;animation:lg-float 16s ease-in-out infinite}
+.lg-bg span:nth-child(1){width:340px;height:340px;left:-90px;top:-80px;background:radial-gradient(circle at 30% 30%,#9fc0f0,#6c93e0);animation-duration:19s}
+.lg-bg span:nth-child(2){width:260px;height:260px;right:-60px;top:12%;background:radial-gradient(circle at 30% 30%,#c9b8f5,#8f7ad8);animation-duration:23s;animation-delay:-6s}
+.lg-bg span:nth-child(3){width:300px;height:300px;left:12%;bottom:-120px;background:radial-gradient(circle at 30% 30%,#a8e3d0,#5fb99c);animation-duration:21s;animation-delay:-3s}
+.lg-bg span:nth-child(4){width:180px;height:180px;right:14%;bottom:8%;background:radial-gradient(circle at 30% 30%,#ffd9a0,#f0a94e);animation-duration:17s;animation-delay:-9s}
+.lg-bg span:nth-child(5){width:90px;height:90px;left:34%;top:10%;background:radial-gradient(circle at 30% 30%,#fff,#9fc0f0);animation-duration:14s;animation-delay:-4s}
+.lg-bg span:nth-child(6){width:60px;height:60px;right:32%;bottom:26%;background:radial-gradient(circle at 30% 30%,#fff,#c9b8f5);animation-duration:12s;animation-delay:-7s}
+@keyframes lg-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes lg-float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-50px) scale(1.08)}66%{transform:translate(-30px,35px) scale(.94)}}
+@media(prefers-reduced-motion:reduce){.login-wrap,.lg-bg span{animation:none}}

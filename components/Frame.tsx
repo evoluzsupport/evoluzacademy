@@ -166,13 +166,13 @@ export default function Frame({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const isLogin = path === '/login';
+  const isPublic = path === '/login' || path === '/welcome';
 
   useEffect(() => {
     if (!ready) return;
-    if (!me && !isLogin) router.replace('/login');
-    if (me && isLogin) router.replace('/');
-  }, [ready, me, isLogin, router]);
+    if (!me && !isPublic) router.replace('/welcome');
+    if (me && isPublic) router.replace('/');
+  }, [ready, me, isPublic, router]);
 
   useEffect(() => setOpen(false), [path]);
 
@@ -182,7 +182,7 @@ export default function Frame({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  if (isLogin) return <>{children}</>;
+  if (isPublic) return <>{children}</>;
   if (!ready || !me) return null;
 
   const nav = NAV[me.kind];

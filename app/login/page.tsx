@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
+import './login-bg.css';
 
 const DEMO = [
   ['Admin', 'admin@evoluz.tech', 'demo@123'],
@@ -36,6 +37,9 @@ export default function LoginPage() {
   if (!ready) return null;
   return (
     <div className="login-wrap">
+      <div className="lg-bg" aria-hidden="true">
+        <span /><span /><span /><span /><span /><span />
+      </div>
       <div className="login-box">
         <Image src="/evoluz-logo.png" alt="Evoluz" width={190} height={51} priority style={{ width: 190, height: 'auto' }} />
         <h1>Evoluz Academy</h1>
