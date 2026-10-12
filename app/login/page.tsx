@@ -7,8 +7,8 @@ import { usePortal } from '@/lib/store';
 
 const DEMO = [
   ['Admin', 'admin@evoluz.tech', 'demo@123'],
-  ['Trainer', 'shivangi@evoluz.tech', 'demo123'],
-  ['Trainee', 'mira.shah@evoluz.tech', 'demo123'],
+  ['Trainer', 'trainer@evoluz.tech', 'demo@123'],
+  ['Trainee', 'trainee@evoluz.tech', 'demo@123'],
 ];
 
 export default function LoginPage() {
@@ -27,9 +27,10 @@ export default function LoginPage() {
     if (m) setErr(m);
   };
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (login(email, pw)) router.replace('/');
+    setErr('');
+    if (await login(email, pw)) router.replace('/');
     else setErr('Invalid email or password.');
   };
   if (!ready) return null;

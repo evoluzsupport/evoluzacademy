@@ -1,21 +1,15 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Kind, Me, State } from './types';
+import type { Kind, Me, State, Trainee, Trainer } from './types';
 import { makeSeed } from './seed';
+import { emptyState, loadRemote, myProfile, pushDiff, seedRemote } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
 import { isAssigned, topicKey } from './selectors';
 import { supabase } from './supabase';
 
-const KEY = 'evoluzTrainingState_v2';
-const SKEY = 'evoluzSession_v2';
-
-interface Session {
-  kind: Kind;
-  id: string;
-}
 interface ModalState {
   content: ReactNode;
   wide: boolean;
@@ -34,7 +28,7 @@ export interface Ctx {
   ready: boolean;
   S: State;
   me: Me | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   loginWithZoho: () => Promise<string | null>;
   logout: () => void;
   update: (fn: (s: State) => void) => void;
@@ -54,8 +48,9 @@ export interface Ctx {
   removeTrainee: (id: string) => void;
   removeCourse: (id: string) => void;
   removeTopic: (cid: string, topicId: string) => void;
+  setRole: (id: string, role: Kind) => boolean;
+  addPeople: (people: { name: string; email: string; role: Kind }[]) => { added: number; skipped: string[] };
   importCSV: (kind: ImportKind, file: File, courseId?: string) => Promise<void>;
-  resetDemo: () => void;
 }
 
 const PortalCtx = createContext<Ctx | null>(null);
@@ -92,85 +87,23 @@ function applySession(s: State, d: SessionDraft): string | null {
   return `Session saved · ${newMarks} topic marks${kept ? ` · ${kept} existing marks preserved` : ''}`;
 }
 
-function findMe(S: State, s: Session | null): Me | null {
-  if (!s) return null;
-  const pool = s.kind === 'admin' ? S.admins : s.kind === 'trainer' ? S.trainers : S.trainees;
-  const x = pool.find((p) => p.id === s.id);
-  return x ? { kind: s.kind, id: x.id, name: x.name, email: x.email, phone: x.phone } : null;
+function findMe(S: State, kind: Kind, id: string): Me | null {
+  const pool = kind === 'admin' ? S.admins : kind === 'trainer' ? S.trainers : S.trainees;
+  const x = pool.find((p) => p.id === id);
+  return x ? { kind, id: x.id, name: x.name, email: x.email, phone: x.phone } : null;
 }
 
 export function PortalProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [S, setS] = useState<State>(() => makeSeed());
-  const [session, setSession] = useState<Session | null>(null);
+  const [S, setS] = useState<State>(() => emptyState());
   const [remoteMe, setRemoteMe] = useState<Me | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [toastMsg, setToastMsg] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    let state: State | null = null;
-    try {
-      state = JSON.parse(localStorage.getItem(KEY) || 'null');
-    } catch {}
-    if (!state || !state.courses || !state.trainees) {
-      state = makeSeed();
-      try {
-        localStorage.setItem(KEY, JSON.stringify(state));
-      } catch {}
-    }
-    setS(state);
-    try {
-      const s: Session | null = JSON.parse(sessionStorage.getItem(SKEY) || 'null');
-      if (s && findMe(state, s)) setSession(s);
-    } catch {}
-    setReady(true);
-  }, []);
-
-  // Keep every open tab in sync: a trainee's tick shows up in the trainer's tab at once.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== KEY || !e.newValue) return;
-      try {
-        const next: State = JSON.parse(e.newValue);
-        if (next.courses && next.trainees) setS(next);
-      } catch {}
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-
-  // Zoho sign-in: Supabase holds the session, the `profiles` row carries the role.
-  useEffect(() => {
-    const load = async (userId: string | undefined) => {
-      if (!userId) return setRemoteMe(null);
-      const { data } = await supabase.from('profiles').select('id,name,email,phone,role').eq('id', userId).maybeSingle();
-      if (!data) {
-        await supabase.auth.signOut();
-        return setRemoteMe(null);
-      }
-      setRemoteMe({ kind: data.role as Kind, id: data.id, name: data.name, email: data.email, phone: data.phone ?? undefined });
-    };
-    supabase.auth.getSession().then(({ data }) => load(data.session?.user.id));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      // defer: no supabase calls inside the callback
-      setTimeout(() => load(s?.user.id), 0);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  const me = useMemo(() => remoteMe ?? findMe(S, session), [S, session, remoteMe]);
-
-  const update = useCallback((fn: (s: State) => void) => {
-    setS((prev) => {
-      const next = structuredClone(prev);
-      fn(next);
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  }, []);
+  // latest state, updated synchronously so back-to-back updates compose
+  const S0 = useRef(S);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const bootedFor = useRef<string | null>(null);
 
   const toast = useCallback((m: string) => {
     setToastMsg(m);
@@ -178,30 +111,95 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     toastTimer.current = setTimeout(() => setToastMsg(''), 2600);
   }, []);
 
-  const login = useCallback(
-    (email: string, password: string) => {
-      const em = email.trim().toLowerCase();
-      if (!em) return false;
-      const pools: [Kind, { id: string; email: string; password: string }[]][] = [
-        ['admin', S.admins],
-        ['trainer', S.trainers],
-        ['trainee', S.trainees],
-      ];
-      for (const [kind, list] of pools) {
-        const f = list.find((x) => x.email.toLowerCase() === em && x.password === password);
-        if (f) {
-          const s = { kind, id: f.id };
-          try {
-            sessionStorage.setItem(SKEY, JSON.stringify(s));
-          } catch {}
-          setSession(s);
-          return true;
+  const adopt = useCallback((next: State) => {
+    S0.current = next;
+    setS(next);
+  }, []);
+
+  const reload = useCallback(async () => {
+    try {
+      adopt(await loadRemote());
+    } catch {}
+  }, [adopt]);
+
+  // Supabase holds the session; the `profiles` row carries the role.
+  useEffect(() => {
+    const boot = async (userId: string) => {
+      if (bootedFor.current === userId) return;
+      bootedFor.current = userId;
+      try {
+        const p = await myProfile(userId);
+        if (!p) {
+          bootedFor.current = null;
+          await supabase.auth.signOut();
+          return;
         }
+        let state = await loadRemote();
+        if (!state.courses.length && p.role === 'admin') {
+          await seedRemote(makeSeed());
+          state = await loadRemote();
+        }
+        adopt(state);
+        setRemoteMe({ kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined });
+      } catch (e) {
+        bootedFor.current = null;
+        toast(e instanceof Error ? e.message : 'Could not load data');
+      } finally {
+        setReady(true);
       }
-      return false;
-    },
-    [S]
+    };
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // never await supabase calls inside this callback
+      setTimeout(() => {
+        if (session?.user) void boot(session.user.id);
+        else {
+          bootedFor.current = null;
+          setRemoteMe(null);
+          adopt(emptyState());
+          setReady(true);
+        }
+      }, 0);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [adopt, toast]);
+
+  // Pick up other people's changes when this tab regains focus.
+  useEffect(() => {
+    let last = 0;
+    const onFocus = () => {
+      if (!bootedFor.current || Date.now() - last < 10000) return;
+      last = Date.now();
+      queue.current = queue.current.then(reload);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [reload]);
+
+  const me = useMemo(
+    () => (remoteMe ? findMe(S, remoteMe.kind, remoteMe.id) ?? remoteMe : null),
+    [S, remoteMe]
   );
+
+  const update = useCallback(
+    (fn: (s: State) => void) => {
+      const prev = S0.current;
+      const next = structuredClone(prev);
+      fn(next);
+      adopt(next);
+      queue.current = queue.current
+        .then(() => pushDiff(prev, next))
+        .catch(async (e) => {
+          toast(`Could not save: ${e instanceof Error ? e.message : 'unknown error'}`);
+          await reload();
+        });
+    },
+    [adopt, toast, reload]
+  );
+
+  const login = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    return !error;
+  }, []);
 
   const loginWithZoho = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -212,12 +210,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    supabase.auth.signOut();
-    setRemoteMe(null);
-    try {
-      sessionStorage.removeItem(SKEY);
-    } catch {}
-    setSession(null);
+    void supabase.auth.signOut();
     setModal(null);
   }, []);
 
@@ -250,10 +243,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       }),
     []
   );
-
-  // latest state for checks that must not depend on lazy updaters
-  const S0 = useRef(S);
-  S0.current = S;
 
   const actions = useMemo(() => {
     const toggleTopic: Ctx['toggleTopic'] = (tid, cid, topicId, trainer, date) => {
@@ -354,16 +343,66 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const resetDemo = () => {
-      const fresh = makeSeed();
-      setS(fresh);
-      try {
-        localStorage.setItem(KEY, JSON.stringify(fresh));
-      } catch {}
-      toast('Demo data restored');
+    const setRole: Ctx['setRole'] = (id, role) => {
+      const cur = S0.current;
+      const all = [...cur.admins, ...cur.trainers, ...cur.trainees];
+      const who = all.find((p) => p.id === id);
+      if (!who) return false;
+      const was: Kind = cur.admins.some((a) => a.id === id) ? 'admin' : cur.trainers.some((t) => t.id === id) ? 'trainer' : 'trainee';
+      if (was === role) return true;
+      if (was === 'admin' && cur.admins.length <= 1) {
+        toast('There must be at least one admin');
+        return false;
+      }
+      update((s) => {
+        s.admins = s.admins.filter((p) => p.id !== id);
+        s.trainers = s.trainers.filter((p) => p.id !== id);
+        s.trainees = s.trainees.filter((p) => p.id !== id);
+        const base = { id, name: who.name, email: who.email, phone: who.phone, password: '' };
+        const old = who as Partial<Trainer & Trainee>;
+        if (role === 'admin') s.admins.push(base);
+        else if (role === 'trainer') s.trainers.push({ ...base, specialty: old.specialty ?? '', tone: old.tone ?? '' });
+        else
+          s.trainees.push({
+            ...base,
+            jobRole: old.jobRole ?? 'Trainee',
+            joined: old.joined ?? today(),
+            status: old.status ?? 'Active',
+            trainer: old.trainer ?? '',
+            tone: old.tone ?? '',
+          });
+      });
+      toast(`${who.name} is now ${role === 'admin' ? 'an admin' : 'a ' + role}`);
+      return true;
     };
 
-    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeTopic, importCSV, resetDemo };
+    const addPeople: Ctx['addPeople'] = (people) => {
+      const cur = S0.current;
+      const taken = new Set([...cur.admins, ...cur.trainers, ...cur.trainees].map((p) => p.email.toLowerCase()).filter(Boolean));
+      const fresh: typeof people = [];
+      const skipped: string[] = [];
+      for (const p of people) {
+        const email = p.email.trim().toLowerCase();
+        if (!/^\S+@\S+\.\S+$/.test(email) || taken.has(email)) {
+          skipped.push(p.email || p.name);
+          continue;
+        }
+        taken.add(email);
+        fresh.push({ ...p, email, name: p.name.trim() || email.split('@')[0] });
+      }
+      if (fresh.length)
+        update((s) => {
+          for (const p of fresh) {
+            const base = { id: uid(p.role === 'admin' ? 'ad-' : p.role === 'trainer' ? 'r-' : 't-'), name: p.name, email: p.email, password: '' };
+            if (p.role === 'admin') s.admins.push(base);
+            else if (p.role === 'trainer') s.trainers.push({ ...base, specialty: '', tone: '' });
+            else s.trainees.push({ ...base, jobRole: 'Trainee', joined: today(), status: 'Active', trainer: '', tone: '' });
+          }
+        });
+      return { added: fresh.length, skipped };
+    };
+
+    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeTopic, importCSV, setRole, addPeople };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update, toast]);
 

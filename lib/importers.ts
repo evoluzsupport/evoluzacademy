@@ -8,7 +8,7 @@ const normDay = (d: string) => (/^\d+$/.test(d) ? 'Day ' + Number(d) : d);
 function ensureTrainer(S: State, name: string, specialty: string) {
   name = name.trim();
   if (!name || S.trainers.some((t) => lc(t.name) === lc(name))) return;
-  S.trainers.push({ id: uid('r-import-'), name, specialty, email: '', password: 'demo123', tone: 'lilac' });
+  S.trainers.push({ id: uid('r-import-'), name, specialty, email: '', password: '', tone: 'lilac' });
 }
 
 function upsertTopic(S: State, c: Course, row: Row, primary: string, trainerCols: string[]): boolean {
@@ -56,7 +56,7 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
         if (specialty !== undefined) existing.specialty = specialty;
         if (email !== undefined) existing.email = email;
       } else {
-        S.trainers.push({ id: uid('r-import-'), name, specialty: specialty || 'Imported trainer', email: email || '', password: 'demo123', tone: 'lilac' });
+        S.trainers.push({ id: uid('r-import-'), name, specialty: specialty || 'Imported trainer', email: email || '', password: '', tone: 'lilac' });
       }
       count++;
     }
@@ -67,7 +67,7 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
       const email = field(row, 'Email');
       const existing = S.trainees.find((t) => (email && t.email && lc(t.email) === lc(email)) || lc(t.name) === lc(name));
       const t: Trainee =
-        existing ?? { id: uid('t-import-'), name, email: '', password: 'demo123', jobRole: 'Trainee', joined: today(), status: 'Active', trainer: '', tone: '' };
+        existing ?? { id: uid('t-import-'), name, email: '', password: '', jobRole: 'Trainee', joined: today(), status: 'Active', trainer: '', tone: '' };
       const trainer = field(row, 'Trainer');
       const status = field(row, 'Status');
       Object.assign(t, {

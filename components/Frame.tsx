@@ -26,7 +26,10 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
     ],
-    insights: [{ href: '/analytics', label: 'Analytics', icon: '◔' }],
+    insights: [
+      { href: '/analytics', label: 'Analytics', icon: '◔' },
+      { href: '/roles', label: 'Roles & access', icon: '⚿' },
+    ],
   },
   trainer: {
     workspace: [

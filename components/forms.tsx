@@ -23,7 +23,7 @@ export function TraineeForm({ id }: { id?: string }) {
   const { S, update, closeModal, toast } = usePortal();
   const ex = id ? S.trainees.find((t) => t.id === id) : undefined;
   const [f, setF] = useState<Omit<Trainee, 'id' | 'tone'>>(
-    ex ?? { name: '', jobRole: '', email: '', trainer: '', joined: today(), status: 'Active', password: 'demo123' }
+    ex ?? { name: '', jobRole: '', email: '', trainer: '', joined: today(), status: 'Active', password: '' }
   );
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
@@ -62,7 +62,6 @@ export function TraineeForm({ id }: { id?: string }) {
               <option>On hold</option>
             </select>
           </Field>
-          <Field label="Password" full><input value={f.password} onChange={(e) => set('password', e.target.value)} required minLength={4} /></Field>
         </div>
         <FormActions onCancel={closeModal} />
       </form>
@@ -73,7 +72,7 @@ export function TraineeForm({ id }: { id?: string }) {
 export function TrainerForm({ id }: { id?: string }) {
   const { S, update, closeModal, toast } = usePortal();
   const ex = id ? S.trainers.find((t) => t.id === id) : undefined;
-  const [f, setF] = useState<Omit<Trainer, 'id' | 'tone'>>(ex ?? { name: '', specialty: '', email: '', password: 'demo123' });
+  const [f, setF] = useState<Omit<Trainer, 'id' | 'tone'>>(ex ?? { name: '', specialty: '', email: '', password: '' });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
   const submit = (e: FormEvent) => {
@@ -107,7 +106,6 @@ export function TrainerForm({ id }: { id?: string }) {
           <Field label="Name"><input value={f.name} onChange={(e) => set('name', e.target.value)} required /></Field>
           <Field label="Specialty"><input value={f.specialty} onChange={(e) => set('specialty', e.target.value)} /></Field>
           <Field label="Email (login)"><input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
-          <Field label="Password"><input value={f.password} onChange={(e) => set('password', e.target.value)} required minLength={4} /></Field>
         </div>
         <FormActions onCancel={closeModal} />
       </form>
