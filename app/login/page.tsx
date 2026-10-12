@@ -39,10 +39,6 @@ export default function LoginPage() {
         <Image src="/evoluz-logo.png" alt="Evoluz" width={190} height={51} priority style={{ width: 190, height: 'auto' }} />
         <h1>Evoluz Academy</h1>
         <p className="lead">Sign in to see your trainees, courses and training progress.</p>
-        <button type="button" className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 11 }} onClick={zoho}>
-          Sign in with Zoho
-        </button>
-        <p className="subtle" style={{ margin: '14px 0' }}>or use a demo account</p>
         <form onSubmit={submit}>
           <div className="field">
             <label htmlFor="em">Email</label>
@@ -53,7 +49,17 @@ export default function LoginPage() {
             <input id="pw" type="password" required autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
           </div>
           <p className="login-err" role="alert">{err}</p>
-          <button className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 11 }}>Sign in</button>
+          <div className="login-actions">
+            <button className="btn primary login-btn">Sign in</button>
+            <span className="login-or">or</span>
+            <button type="button" className="btn login-btn zoho-btn" onClick={zoho}>
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="24" height="24" rx="5" fill="#fff" />
+                <path d="M6 7h12l-8.5 10H18" fill="none" stroke="#e42527" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Sign in with Zoho
+            </button>
+          </div>
         </form>
         <p className="subtle" style={{ margin: '18px 0 0' }}>Demo accounts:</p>
         <div className="demo-row">

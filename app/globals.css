@@ -26,3 +26,20 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .bell:after{display:none}
 .sub-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:15px}
 .readonly-note{font-size:11px;color:#8d98a8;margin-top:8px}
+
+.login-actions{display:grid;gap:10px;margin-top:6px}
+.login-btn{width:100%;justify-content:center;padding:11px;min-height:42px}
+.login-or{text-align:center;color:var(--muted);font-size:11px}
+.btn.zoho-btn{background:#e42527;border-color:#e42527;color:#fff;box-shadow:0 4px 10px #e4252722}
+.btn.zoho-btn:hover{background:#c91f21;border-color:#c91f21;color:#fff}
+
+.pmenu{position:relative}
+.pmenu-panel{position:absolute;right:0;top:calc(100% + 9px);min-width:210px;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 32px #203d7020;padding:6px;z-index:8;display:grid}
+.pmenu-who{padding:9px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:5px;display:grid;gap:2px}
+.pmenu-who b{font-size:12px}.pmenu-who small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.pmenu-panel a,.pmenu-panel button{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:8px;font-size:12px;font-weight:600;color:#41506a}
+.pmenu-panel a:hover,.pmenu-panel button:hover{background:#f4f7fc;color:var(--navy)}
+.pmenu-panel button{color:var(--red)}
+/* night mode: invert the light UI, then restore images and brand colours */
+html[data-theme=dark]{filter:invert(1) hue-rotate(180deg);background:#fff}
+html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avatar{filter:invert(1) hue-rotate(180deg)}

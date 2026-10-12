@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { usePortal } from '@/lib/store';
 import { attentionItems, scopeTrainees } from '@/lib/selectors';
@@ -94,6 +94,67 @@ function Bell() {
     <button className="bell" title="Notifications" aria-label={`Notifications (${items.length})`} onClick={open}>
       ♧{items.length > 0 && <span className="badge">{items.length}</span>}
     </button>
+  );
+}
+
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => setDark(document.documentElement.dataset.theme === 'dark'), []);
+  const flip = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.dataset.theme = next ? 'dark' : 'light';
+    try {
+      localStorage.setItem('evoluzTheme', next ? 'dark' : 'light');
+    } catch {}
+  };
+  return (
+    <button className="bell" title={dark ? 'Switch to light mode' : 'Switch to night mode'} aria-label="Toggle night mode" aria-pressed={dark} onClick={flip}>
+      {dark ? '☀' : '☾'}
+    </button>
+  );
+}
+
+function ProfileMenu({ tone }: { tone: string }) {
+  const { me, logout } = usePortal();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  if (!me) return null;
+  return (
+    <div className="pmenu" ref={box}>
+      <button
+        className={`avatar ${TONES.includes(tone) ? tone : 'coral'}`}
+        style={{ width: 33, height: 33, borderRadius: '50%', border: 0 }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Account"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {initials(me.name)}
+      </button>
+      {open && (
+        <div className="pmenu-panel" role="menu">
+          <div className="pmenu-who">
+            <b>{me.name}</b>
+            <small>{me.email}</small>
+          </div>
+          <Link href="/profile" role="menuitem" onClick={() => setOpen(false)}>My profile</Link>
+          <button role="menuitem" onClick={() => { setOpen(false); logout(); router.replace('/login'); }}>Log out</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -191,10 +252,9 @@ export default function Frame({ children }: { children: ReactNode }) {
                 <input placeholder="Search trainees, courses..." onKeyDown={search} aria-label="Search" />
               </label>
             )}
+            <ThemeToggle />
             <Bell />
-            <Link href="/profile" className={`avatar ${TONES.includes(mine ?? '') ? mine : 'coral'}`} style={{ width: 33, height: 33, borderRadius: '50%' }} title="My profile">
-              {initials(me.name)}
-            </Link>
+            <ProfileMenu tone={mine ?? ''} />
           </div>
         </header>
         <div className="content">{children}</div>
