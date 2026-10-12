@@ -1,0 +1,192 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { usePortal } from '@/lib/store';
+import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey, trainerNames } from '@/lib/selectors';
+import { primaryOf } from '@/lib/seed';
+import { today, validPastOrToday } from '@/lib/util';
+import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
+
+export default function SessionPage() {
+  const { S, me, saveSession, toast } = usePortal();
+  const router = useRouter();
+  const [courseId, setCourseId] = useState('');
+  const [trainer, setTrainer] = useState('');
+  const [date, setDate] = useState(today());
+  const [traineeIds, setTraineeIds] = useState<string[]>([]);
+  const [topicIds, setTopicIds] = useState<string[]>([]);
+  const [updateExisting, setUpdateExisting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const picker = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const click = (e: MouseEvent) => {
+      if (menuOpen && picker.current && !picker.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('click', click);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('click', click);
+      document.removeEventListener('keydown', key);
+    };
+  }, [menuOpen]);
+
+  const myName = me?.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.name : undefined;
+  const c = S.courses.find((x) => x.id === courseId);
+  const scope = new Set(scopeTrainees(S, me).map((t) => t.id));
+
+  const startCourse = (id: string) => {
+    const cc = S.courses.find((x) => x.id === id);
+    setCourseId(id);
+    setTrainer(cc ? (myName ?? primaryOf(cc)) : '');
+    setDate(today());
+    setMenuOpen(false);
+    setTopicIds([]);
+    setUpdateExisting(false);
+    setTraineeIds(cc ? S.trainees.filter((t) => isAssigned(S, t.id, cc.id) && scope.has(t.id)).map((t) => t.id) : []);
+  };
+
+  const head = (
+    <PageHead
+      title="Log a training session"
+      desc={c ? 'Choose the attendees, check the topics covered, then save once for the group.' : 'Choose a course first. Its assigned trainees and topics will appear next.'}
+    />
+  );
+
+  if (!c) {
+    return (
+      <Guard kinds={['admin', 'trainer']}>
+        {head}
+        <section className="card detail-panel" style={{ maxWidth: 760 }}>
+          <div className="field">
+            <label htmlFor="s-course">Course</label>
+            <select id="s-course" className="select" style={{ width: '100%' }} value="" onChange={(e) => startCourse(e.target.value)}>
+              <option value="">Choose a course…</option>
+              {S.courses.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </div>
+        </section>
+      </Guard>
+    );
+  }
+
+  const eligible = S.trainees.filter((t) => isAssigned(S, t.id, c.id) && scope.has(t.id));
+  const selected = new Set(traineeIds);
+  const chosen = new Set(topicIds);
+  const names = eligible.filter((t) => selected.has(t.id)).map((t) => t.name);
+  let marks = 0;
+  let already = 0;
+  chosen.forEach((topicId) =>
+    selected.forEach((tid) => (S.progress[topicKey(tid, c.id, topicId)]?.done ? already++ : marks++))
+  );
+
+  const toggle = <T,>(list: T[], v: T, on: boolean) => (on ? [...new Set([...list, v])] : list.filter((x) => x !== v));
+
+  const save = () => {
+    const attendees = traineeIds.filter((tid) => isAssigned(S, tid, c.id));
+    if (!attendees.length || !topicIds.length) return toast('Choose a course, at least one attendee, and a topic');
+    if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
+    const msg = saveSession({ courseId: c.id, trainer: trainer || primaryOf(c), date, traineeIds: attendees, topicIds, updateExisting });
+    if (msg) {
+      toast(msg);
+      router.push('/sessions');
+    }
+  };
+
+  return (
+    <Guard kinds={['admin', 'trainer']}>
+      <PageHead
+        title="Log a training session"
+        desc="Choose the attendees, check the topics covered, then save once for the group."
+        actions={<button className="btn primary" onClick={save}>✓ Save session</button>}
+      />
+      <div className="grid" style={{ gap: 15 }}>
+        <section className="card detail-panel">
+          <SectionTitle title="1 · Session details" right={<Pill kind="progress">Primary trainer · {primaryOf(c)}</Pill>} />
+          <div className="form-grid">
+            <div className="field full">
+              <label htmlFor="s-c2">Course</label>
+              <select id="s-c2" className="select" style={{ width: '100%' }} value={c.id} onChange={(e) => startCourse(e.target.value)}>
+                {S.courses.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="s-tr">Trainer who delivered this session</label>
+              <select id="s-tr" className="select" style={{ width: '100%' }} value={trainer || primaryOf(c)} onChange={(e) => setTrainer(e.target.value)}>
+                {trainerNames(S, trainer || primaryOf(c)).map((n) => <option key={n}>{n}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="s-dt">Session date</label>
+              <input id="s-dt" className="input" style={{ width: '100%' }} type="date" max={today()} value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+        </section>
+
+        <section className="card detail-panel">
+          <SectionTitle title="2 · Who is attending?" sub="All assigned trainees are selected by default. Remove anyone absent from the dropdown." />
+          <div className="attendee-picker" ref={picker}>
+            <button type="button" className="attendee-trigger" aria-expanded={menuOpen} aria-controls="attendeeMenu" onClick={() => setMenuOpen((o) => !o)}>
+              <span className="attendee-trigger-copy">
+                <b>{selected.size} of {eligible.length} selected</b>
+                <small>{names.join(', ') || (eligible.length ? 'Choose trainees' : 'No trainees assigned')}</small>
+              </span>
+              <span className="attendee-chevron">⌄</span>
+            </button>
+            {menuOpen && (
+              <div className="attendee-menu" id="attendeeMenu">
+                <div className="attendee-menu-actions">
+                  <b>{selected.size} of {eligible.length} selected</b>
+                  <span>
+                    <button type="button" className="btn soft" onClick={() => setTraineeIds(eligible.map((t) => t.id))}>Select all</button>
+                    <button type="button" className="btn" onClick={() => setTraineeIds([])}>Clear</button>
+                  </span>
+                </div>
+                <div className="attendee-option-list">
+                  {eligible.map((t) => (
+                    <label className="attendee-option" key={t.id}>
+                      <input type="checkbox" checked={selected.has(t.id)} onChange={(e) => setTraineeIds((l) => toggle(l, t.id, e.target.checked))} />
+                      <span className="attendee-identity">
+                        <Avatar name={t.name} tone={t.tone} />
+                        <span><b>{t.name}</b><small>{t.jobRole} · {t.status}</small></span>
+                      </span>
+                      <em>{statCourse(S, t.id, c).done}/{c.topics.length} done</em>
+                    </label>
+                  ))}
+                  {!eligible.length && <div className="empty">No trainees are assigned to this course yet.</div>}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="card detail-panel">
+          <SectionTitle
+            title="3 · Topics covered"
+            sub="Every checked topic will be marked for all selected trainees above."
+            right={<button className="btn soft" onClick={() => setTopicIds(c.topics.map((t) => t.id))}>Select all topics</button>}
+          />
+          <div className="choice-list topic-choices">
+            {orderedTopics(c).map((x) => (
+              <label className="choice topic-choice" key={x.id}>
+                <input type="checkbox" checked={chosen.has(x.id)} onChange={(e) => setTopicIds((l) => toggle(l, x.id, e.target.checked))} />
+                <span><b>{x.topic}</b><small>{x.day} · {x.activity || x.cover}</small></span>
+              </label>
+            ))}
+          </div>
+          <label className="choice" style={{ marginTop: 13 }}>
+            <input type="checkbox" checked={updateExisting} onChange={(e) => setUpdateExisting(e.target.checked)} />
+            <span><span><b>Update already completed topics</b><small>Off by default; existing trainer and date are preserved.</small></span></span>
+          </label>
+          <div className="session-summary">
+            <div><b>{selected.size}</b><span>attendees</span></div>
+            <div><b>{chosen.size}</b><span>topics</span></div>
+            <div><b>{marks}</b><span>new marks</span></div>
+            <div><b>{already}</b><span>already done</span></div>
+          </div>
+        </section>
+      </div>
+    </Guard>
+  );
+}
