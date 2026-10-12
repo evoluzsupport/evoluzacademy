@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
@@ -12,11 +12,20 @@ const DEMO = [
 ];
 
 export default function LoginPage() {
-  const { login, ready } = usePortal();
+  const { login, loginWithZoho, ready, me } = usePortal();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (ready && me) router.replace('/');
+  }, [ready, me, router]);
+
+  const zoho = async () => {
+    const m = await loginWithZoho();
+    if (m) setErr(m);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -30,6 +39,10 @@ export default function LoginPage() {
         <Image src="/evoluz-logo.png" alt="Evoluz" width={190} height={51} priority style={{ width: 190, height: 'auto' }} />
         <h1>Evoluz Academy</h1>
         <p className="lead">Sign in to see your trainees, courses and training progress.</p>
+        <button type="button" className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 11 }} onClick={zoho}>
+          Sign in with Zoho
+        </button>
+        <p className="subtle" style={{ margin: '14px 0' }}>or use a demo account</p>
         <form onSubmit={submit}>
           <div className="field">
             <label htmlFor="em">Email</label>

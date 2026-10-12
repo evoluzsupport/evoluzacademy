@@ -7,6 +7,7 @@ import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
 import { isAssigned, topicKey } from './selectors';
+import { supabase } from './supabase';
 
 const KEY = 'evoluzTrainingState_v2';
 const SKEY = 'evoluzSession_v2';
@@ -34,6 +35,7 @@ export interface Ctx {
   S: State;
   me: Me | null;
   login: (email: string, password: string) => boolean;
+  loginWithZoho: () => Promise<string | null>;
   logout: () => void;
   update: (fn: (s: State) => void) => void;
   toast: (m: string) => void;
@@ -101,6 +103,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [S, setS] = useState<State>(() => makeSeed());
   const [session, setSession] = useState<Session | null>(null);
+  const [remoteMe, setRemoteMe] = useState<Me | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [toastMsg, setToastMsg] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -137,7 +140,26 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const me = useMemo(() => findMe(S, session), [S, session]);
+  // Zoho sign-in: Supabase holds the session, the `profiles` row carries the role.
+  useEffect(() => {
+    const load = async (userId: string | undefined) => {
+      if (!userId) return setRemoteMe(null);
+      const { data } = await supabase.from('profiles').select('id,name,email,phone,role').eq('id', userId).maybeSingle();
+      if (!data) {
+        await supabase.auth.signOut();
+        return setRemoteMe(null);
+      }
+      setRemoteMe({ kind: data.role as Kind, id: data.id, name: data.name, email: data.email, phone: data.phone ?? undefined });
+    };
+    supabase.auth.getSession().then(({ data }) => load(data.session?.user.id));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      // defer: no supabase calls inside the callback
+      setTimeout(() => load(s?.user.id), 0);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const me = useMemo(() => remoteMe ?? findMe(S, session), [S, session, remoteMe]);
 
   const update = useCallback((fn: (s: State) => void) => {
     setS((prev) => {
@@ -181,7 +203,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     [S]
   );
 
+  const loginWithZoho = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'custom:evoluzacademy' as never,
+      options: { redirectTo: `${window.location.origin}/login` },
+    });
+    return error ? error.message : null;
+  }, []);
+
   const logout = useCallback(() => {
+    supabase.auth.signOut();
+    setRemoteMe(null);
     try {
       sessionStorage.removeItem(SKEY);
     } catch {}
@@ -340,6 +372,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     S,
     me,
     login,
+    loginWithZoho,
     logout,
     update,
     toast,
