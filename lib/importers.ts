@@ -1,6 +1,6 @@
 import { field, type ImportKind, type Row } from './csv';
 import { primaryOf } from './seed';
-import type { Course, State, Topic, Trainee } from './types';
+import type { Course, Kind, State, Topic, Trainee, Trainer } from './types';
 import { dayNumber, daySort, lc, today, uid } from './util';
 
 const normDay = (d: string) => (/^\d+$/.test(d) ? 'Day ' + Number(d) : d);
@@ -96,6 +96,52 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
       }
       count++;
     }
+  } else if (kind === 'users') {
+    let invalid = 0;
+    let kept = 0;
+    for (const row of rows) {
+      const email = lc(field(row, 'Email'));
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        invalid++;
+        continue;
+      }
+      const cell = lc(field(row, 'Access', 'Role type', 'User type'));
+      const asked: Kind | undefined = cell === 'admin' || cell === 'trainer' || cell === 'trainee' ? cell : undefined;
+      const all = [...S.admins, ...S.trainers, ...S.trainees];
+      const old = all.find((p) => lc(p.email) === email) as (Partial<Trainer & Trainee> & { id: string; name: string }) | undefined;
+      const was: Kind | undefined = !old ? undefined : S.admins.some((a) => a.id === old.id) ? 'admin' : S.trainers.some((t) => t.id === old.id) ? 'trainer' : 'trainee';
+      let access: Kind = asked ?? was ?? 'trainee';
+      if (was === 'admin' && access !== 'admin' && S.admins.length <= 1) {
+        access = 'admin';
+        kept++;
+      }
+      const name = field(row, 'Name') || old?.name || email.split('@')[0];
+      const title = field(row, 'Role', 'Specialty', 'Job role') || '';
+      const phone = field(row, 'Phone') || old?.phone;
+      const id = old?.id ?? uid(access === 'admin' ? 'ad-' : access === 'trainer' ? 'r-' : 't-');
+      S.admins = S.admins.filter((p) => p.id !== id);
+      S.trainers = S.trainers.filter((p) => p.id !== id);
+      S.trainees = S.trainees.filter((p) => p.id !== id);
+      const base = { id, name, email, phone: phone || undefined, password: '' };
+      if (access === 'admin') S.admins.push(base);
+      else if (access === 'trainer') S.trainers.push({ ...base, specialty: title || old?.specialty || '', tone: old?.tone ?? 'lilac' });
+      else
+        S.trainees.push({
+          ...base,
+          jobRole: title || old?.jobRole || 'Trainee',
+          joined: old?.joined ?? today(),
+          status: old?.status ?? 'Active',
+          trainer: old?.trainer ?? '',
+          tone: old?.tone ?? 'lilac',
+        });
+      count++;
+    }
+    if (!count) throw new Error('No valid users found. Each row needs a valid Email column value.');
+    return (
+      `${count} user${count === 1 ? '' : 's'} imported or updated.` +
+      (invalid ? ` ${invalid} rows skipped (missing or invalid email).` : '') +
+      (kept ? ' The last admin was not demoted.' : '')
+    );
   } else if (kind === 'curriculum') {
     for (const row of rows) {
       const name = field(row, 'Course', 'Course name');

@@ -59,11 +59,12 @@ export function downloadCSV(rows: (string | number | undefined)[][], name: strin
 
 export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-export type ImportKind = 'trainees' | 'trainers' | 'curriculum' | 'topics';
+export type ImportKind = 'trainees' | 'trainers' | 'curriculum' | 'topics' | 'users';
 
 export const TEMPLATE_COLUMNS: Record<ImportKind, string[]> = {
   trainees: ['Name', 'Email', 'Role', 'Joined', 'Status', 'Trainer', 'Courses'],
   trainers: ['Name', 'Role', 'Email'],
+  users: ['Name', 'Email', 'Access', 'Role', 'Phone'],
   curriculum: ['Course', 'Category', 'Duration', 'Primary Trainer', 'Planned day', 'Topic', 'What we cover', 'Activity / assessment', 'Topic Trainer'],
   topics: ['Course', 'Planned day', 'Topic', 'What we cover', 'Activity / assessment', 'Trainer'],
 };

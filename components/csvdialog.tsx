@@ -3,12 +3,13 @@ import { useRef } from 'react';
 import { usePortal } from '@/lib/store';
 import { downloadCSV, slug, TEMPLATE_COLUMNS, type ImportKind } from '@/lib/csv';
 
-const LABELS: Record<ImportKind, string> = { trainees: 'Trainees', trainers: 'Trainers', curriculum: 'Curriculum', topics: 'Topics' };
+const LABELS: Record<ImportKind, string> = { trainees: 'Trainees', trainers: 'Trainers', curriculum: 'Curriculum', topics: 'Topics', users: 'Users' };
 const DESCRIPTIONS: Record<ImportKind, string> = {
   trainees: 'Download the column template, fill in your trainee rows, then import the completed CSV.',
   trainers: 'Download the column template, fill in your trainer rows, then import the completed CSV.',
   curriculum: 'One row per topic. Repeat the course details for each topic row to import several courses at once.',
   topics: 'Download a template for this course, then import its topic rows.',
+  users: 'One row per person with Name, Email, Access (Admin, Trainer or Trainee), Role and Phone. People already listed by email are updated.',
 };
 
 export function ImportDialog({ kind, courseId = '' }: { kind: ImportKind; courseId?: string }) {

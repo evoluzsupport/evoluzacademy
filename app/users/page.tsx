@@ -4,6 +4,8 @@ import type { FormEvent } from 'react';
 import { match, usePortal } from '@/lib/store';
 import type { Kind } from '@/lib/types';
 import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
+import { ImportDialog } from '@/components/csvdialog';
+import { downloadCSV } from '@/lib/csv';
 
 const ACCESS: { value: Kind; label: string }[] = [
   { value: 'admin', label: 'Admin' },
@@ -98,7 +100,23 @@ export default function UsersPage() {
       <PageHead
         title="Users"
         desc="Everyone who can sign in to Evoluz Academy, with their access. People sign in with Zoho using the email listed here."
-        actions={<button className="btn primary" onClick={() => openModal(<UserForm />)}>＋ Add user</button>}
+        actions={
+          <>
+            <button className="btn" onClick={() => openModal(<ImportDialog kind="users" />)}>Import CSV</button>
+            <button
+              className="btn"
+              onClick={() =>
+                downloadCSV(
+                  [['Name', 'Email', 'Access', 'Role', 'Phone'], ...users.map((u) => [u.name, u.email, u.kind, u.title, u.phone ?? ''])],
+                  'evoluz-users.csv'
+                )
+              }
+            >
+              Export CSV
+            </button>
+            <button className="btn primary" onClick={() => openModal(<UserForm />)}>＋ Add user</button>
+          </>
+        }
       />
 
       <div className="toolbar" style={{ marginBottom: 15 }}>
