@@ -95,7 +95,7 @@ export function makeSeed(): State {
   });
 
   return {
-    admins: [{ id: 'ad1', name: 'Admin · Evoluz', email: 'admin@evoluz.tech', password: 'demo123' }],
+    admins: [{ id: 'ad1', name: 'Admin · Evoluz', email: 'admin@evoluz.tech', password: 'demo@123' }],
     trainers,
     trainees,
     courses,

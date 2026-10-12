@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 
 const DEMO = [
-  ['Admin', 'admin@evoluz.tech'],
-  ['Trainer', 'shivangi@evoluz.tech'],
-  ['Trainee', 'mira.shah@evoluz.tech'],
+  ['Admin', 'admin@evoluz.tech', 'demo@123'],
+  ['Trainer', 'shivangi@evoluz.tech', 'demo123'],
+  ['Trainee', 'mira.shah@evoluz.tech', 'demo123'],
 ];
 
 export default function LoginPage() {
@@ -55,10 +55,10 @@ export default function LoginPage() {
           <p className="login-err" role="alert">{err}</p>
           <button className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 11 }}>Sign in</button>
         </form>
-        <p className="subtle" style={{ margin: '18px 0 0' }}>Demo accounts (password <b>demo123</b>):</p>
+        <p className="subtle" style={{ margin: '18px 0 0' }}>Demo accounts:</p>
         <div className="demo-row">
-          {DEMO.map(([label, em]) => (
-            <button key={em} type="button" className="btn" onClick={() => { setEmail(em); setPw('demo123'); setErr(''); }}>
+          {DEMO.map(([label, em, pass]) => (
+            <button key={em} type="button" className="btn" onClick={() => { setEmail(em); setPw(pass); setErr(''); }}>
               {label}
             </button>
           ))}
