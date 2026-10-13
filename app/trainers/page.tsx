@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { match, usePortal } from '@/lib/store';
-import { assignedCourses, scopeTrainees } from '@/lib/selectors';
+import { scopeTrainees } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import type { Kind } from '@/lib/types';
@@ -54,14 +54,24 @@ export default function TrainersPage() {
   ];
   let pool = all.filter((r) => r.kind === 'trainer' || named.has(norm(r.name)));
 
-  // trainees only see the trainers connected to their own courses
+  // Trainee: the Assigned Trainer comes straight from My Course, i.e. the trainer on each of
+  // their assignments (else the course's primary trainer, else their contact trainer).
   if (me?.kind === 'trainee') {
     const mine = scopeTrainees(S, me)[0];
-    const mineNames = new Set<string>();
-    if (mine?.trainer) names(mine.trainer).forEach((n) => mineNames.add(norm(n)));
-    assignedCourses(S, me.id).forEach((c) => names(primaryOf(c)).forEach((n) => mineNames.add(norm(n))));
-    Object.entries(S.progress).forEach(([k, r]) => k.startsWith(me.id + '|') && names(r.trainer).forEach((n) => mineNames.add(norm(n))));
-    pool = pool.filter((r) => mineNames.has(norm(r.name)) && r.id !== me.id);
+    const real = (v?: string) => (v && v !== 'No Trainer Assigned' ? v : '');
+    const assignedNames = new Map<string, string>();
+    for (const a of S.assignments.filter((x) => x.traineeId === me.id)) {
+      const c = S.courses.find((x) => x.id === a.courseId);
+      if (!c) continue;
+      const v = real(a.trainer) || real(primaryOf(c)) || real(mine?.trainer);
+      names(v).forEach((n) => !assignedNames.has(norm(n)) && assignedNames.set(norm(n), n));
+    }
+    const rows: Row[] = [];
+    for (const [k, n] of assignedNames) {
+      const person = all.find((r) => norm(r.name) === k && r.id !== me.id);
+      rows.push(person ?? { id: 'name:' + k, name: n, tone: '', title: '', email: '', kind: 'trainer' });
+    }
+    pool = rows;
   }
   const list = pool.filter((r) => match(q, r.name, r.title, r.email, r.kind));
 
@@ -121,7 +131,7 @@ export default function TrainersPage() {
                 <tr key={r.id}>
                   <td><div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div></td>
                   <td>{r.title || '—'}</td>
-                  <td><span className={`pill ${r.kind === 'trainer' ? 'active' : r.kind === 'admin' ? 'progress' : 'neutral'}`}>{r.kind[0].toUpperCase() + r.kind.slice(1)}</span></td>
+                  <td><span className={`pill ${r.kind === 'trainer' ? 'active' : r.kind === 'admin' ? 'progress' : 'neutral'}`}>{r.id.startsWith('name:') ? 'Not a user' : r.kind[0].toUpperCase() + r.kind.slice(1)}</span></td>
                   <td>{r.email || <span className="subtle">{isAdmin ? 'No login email yet' : '—'}</span>}</td>
                   <td>{led(r)}</td>
                   <td>{delivered(r)}</td>
