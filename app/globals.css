@@ -60,3 +60,8 @@ html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avata
 .tdet li{position:relative;padding-left:17px;font-size:12px;line-height:1.55;color:#4a5870;font-weight:500}
 .tdet li:before{content:'';position:absolute;left:3px;top:.62em;width:6px;height:6px;border-radius:50%;background:#3158b6;box-shadow:0 0 0 3px #3158b61a}
 .tdet-block.act li:before{background:#168767;box-shadow:0 0 0 3px #1687671a}
+
+/* Title Case for headings, column headers, section labels and buttons (data cells are left as typed) */
+h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.brand small,.crumb b,.tdet-h,.stat-top,.section-title,.pmenu-panel a,.pill,.field label,.topic-day,.mini-stat small,.stat-note{text-transform:capitalize!important}
+.table th,.nav-label,.eyebrow,.lp-eyebrow,.brand small,.tdet-h{letter-spacing:.4px}
+.check,.avatar,.attendee-option,.course-row,.choice span,.person,.list-link{text-transform:none!important}
