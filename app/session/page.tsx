@@ -6,6 +6,7 @@ import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey } from '
 import { primaryOf } from '@/lib/seed';
 import { today, validPastOrToday } from '@/lib/util';
 import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
+import { TopicDetails } from '@/components/topic';
 
 export default function SessionPage() {
   const { S, me, saveSession, toast } = usePortal();
@@ -181,8 +182,7 @@ export default function SessionPage() {
                 <span>
                   <b>{x.topic}</b>
                   <small>{x.day}{x.category ? ` · ${x.category}` : ''}</small>
-                  {x.cover && <small className="topic-line"><i>What we cover:</i> {x.cover}</small>}
-                  {x.activity && <small className="topic-line"><i>Activity:</i> {x.activity}</small>}
+                  <TopicDetails cover={x.cover} activity={x.activity} />
                 </span>
               </label>
             ))}

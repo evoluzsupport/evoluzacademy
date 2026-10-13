@@ -51,3 +51,12 @@ html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avata
 
 .topic-choice small.topic-line{display:block;margin-top:3px;line-height:1.5;white-space:normal}
 .topic-choice small.topic-line i{font-style:normal;font-weight:700;color:#5a6a85}
+
+/* topic details: What we cover / Activity as bullet lists */
+.tdet{display:grid;gap:10px;margin-top:9px}
+.tdet-h{display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#3158b6;background:#eef4ff;border-radius:6px;padding:3px 9px}
+.tdet-h.act{color:#168767;background:#e9f6f0}
+.tdet ul{list-style:none;margin:7px 0 0;padding:0;display:grid;gap:5px}
+.tdet li{position:relative;padding-left:17px;font-size:12px;line-height:1.55;color:#4a5870;font-weight:500}
+.tdet li:before{content:'';position:absolute;left:3px;top:.62em;width:6px;height:6px;border-radius:50%;background:#3158b6;box-shadow:0 0 0 3px #3158b61a}
+.tdet-block.act li:before{background:#168767;box-shadow:0 0 0 3px #1687671a}

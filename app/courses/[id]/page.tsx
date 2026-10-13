@@ -8,6 +8,7 @@ import { downloadCSV, slug } from '@/lib/csv';
 import { Avatar, Empty, Guard, Pill, ProgressBar, SectionTitle } from '@/components/ui';
 import { AssignDialog, CourseForm, TopicForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
+import { TopicDetails } from '@/components/topic';
 
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -62,7 +63,7 @@ export default function CourseDetail() {
                   <div className="topic-day">{x.day}</div>
                   <div>
                     <div className="topic-title">{x.topic}</div>
-                    <div className="topic-desc">{x.cover}{x.activity ? ' · Activity: ' + x.activity : ''}</div>
+                    <TopicDetails cover={x.cover} activity={x.activity} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Pill kind={count === learners.length && learners.length ? 'done' : 'neutral'}>{count}/{learners.length} done</Pill>
