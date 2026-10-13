@@ -31,6 +31,8 @@ export function TraineeForm({ id }: { id?: string }) {
     e.preventDefault();
     const name = f.name.trim();
     if (!name) return toast('Please add a trainee name');
+    if (!f.email.trim()) return toast('Please add an email address');
+    if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) return toast('Please enter a valid email address');
     if (emailTaken(S, f.email.trim(), id)) return toast('Email already in use');
     const data = { ...f, name, email: f.email.trim(), jobRole: f.jobRole.trim() || 'Trainee' };
     update((s) => {
@@ -43,18 +45,12 @@ export function TraineeForm({ id }: { id?: string }) {
   return (
     <>
       <h2>{id ? 'Edit trainee' : 'Add trainee'}</h2>
-      <p>{id ? 'Update profile details and training ownership.' : 'Create a learner profile. You can assign learning paths from the trainee record.'}</p>
-      <form onSubmit={submit}>
+      <p>{id ? 'Update profile details.' : 'Create a learner profile. You can assign learning paths from the trainee record.'}</p>
+      <form onSubmit={submit} noValidate>
         <div className="form-grid">
           <Field label="Full name"><input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Asha Verma" required /></Field>
           <Field label="Role"><input value={f.jobRole} onChange={(e) => set('jobRole', e.target.value)} placeholder="e.g. CRM Consultant" /></Field>
           <Field label="Email (login)"><input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} required /></Field>
-          <Field label="Training contact">
-            <select value={f.trainer} onChange={(e) => set('trainer', e.target.value)}>
-              <option value="">Unassigned</option>
-              {trainerNames(S, f.trainer).map((n) => <option key={n}>{n}</option>)}
-            </select>
-          </Field>
           <Field label="Joined date"><input type="date" value={f.joined} onChange={(e) => set('joined', e.target.value)} /></Field>
           <Field label="Status">
             <select value={f.status} onChange={(e) => set('status', e.target.value as Trainee['status'])}>
@@ -101,7 +97,7 @@ export function TrainerForm({ id }: { id?: string }) {
     <>
       <h2>{id ? 'Edit trainer' : 'Add trainer'}</h2>
       <p>Maintain the trainer directory and each trainer's role. A trainer needs an email to sign in.</p>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} noValidate>
         <div className="form-grid">
           <Field label="Name"><input value={f.name} onChange={(e) => set('name', e.target.value)} required /></Field>
           <Field label="Role"><input value={f.specialty} onChange={(e) => set('specialty', e.target.value)} /></Field>

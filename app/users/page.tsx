@@ -36,7 +36,7 @@ function UserForm({ id }: { id?: string }) {
     <>
       <h2>{id ? 'Edit user' : 'Add user'}</h2>
       <p>Users sign in with the email listed here. Access decides what they can do in the portal.</p>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} noValidate>
         <div className="form-grid">
           <div className="field"><label htmlFor="u-n">Name</label><input id="u-n" value={name} onChange={(e) => setName(e.target.value)} required /></div>
           <div className="field"><label htmlFor="u-e">Email</label><input id="u-e" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>

@@ -51,30 +51,46 @@ export default function TrainersPage() {
       <div className="toolbar" style={{ marginBottom: 15 }}>
         <input className="input" placeholder="Search trainers..." aria-label="Search trainers" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="grid module-grid">
-        {list.map((r) => {
-          const led = S.courses.filter((c) => primaryOf(c) === r.name).length;
-          const delivered = Object.values(S.progress).filter((x) => x.done && x.trainer === r.name).length;
-          return (
-            <article className="card course-card" key={r.id} style={{ cursor: 'default' }}>
-              <div className="course-card-top">
-                <Avatar name={r.name} tone={r.tone} />
-                {isAdmin && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn" onClick={() => openModal(<TrainerForm id={r.id} />)}>Edit</button>
-                    <button className="btn" aria-label={`Remove ${r.name}`} onClick={() => del(r.id, r.name)}>×</button>
-                  </div>
-                )}
-              </div>
-              <h3>{r.name}</h3>
-              <p>{r.specialty}</p>
-              <div className="course-meta"><span>{led} primary courses</span><span>{delivered} completion marks</span></div>
-              <small className="subtle">{r.email || (isAdmin ? 'No login email yet' : '')}</small>
-            </article>
-          );
-        })}
-      </div>
-      {!list.length && <section className="card"><Empty>No trainers to show.</Empty></section>}
+      <section className="card table-card">
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Trainer</th>
+                <th>Role</th>
+                <th>Email</th>
+                <th>Primary courses</th>
+                <th>Completion marks</th>
+                {isAdmin && <th></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((r) => {
+                const led = S.courses.filter((c) => primaryOf(c) === r.name).length;
+                const delivered = Object.values(S.progress).filter((x) => x.done && x.trainer === r.name).length;
+                return (
+                  <tr key={r.id}>
+                    <td><div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div></td>
+                    <td>{r.specialty || '—'}</td>
+                    <td>{r.email || <span className="subtle">{isAdmin ? 'No login email yet' : '—'}</span>}</td>
+                    <td>{led}</td>
+                    <td>{delivered}</td>
+                    {isAdmin && (
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button className="btn" onClick={() => openModal(<TrainerForm id={r.id} />)}>Edit</button>
+                          <button className="btn" aria-label={`Remove ${r.name}`} onClick={() => del(r.id, r.name)}>×</button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!list.length && <Empty>No trainers to show.</Empty>}
+      </section>
     </Guard>
   );
 }

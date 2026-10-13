@@ -55,6 +55,7 @@ export interface Ctx {
   undoSession: (id: string) => void;
   removeTrainee: (id: string) => void;
   removeCourse: (id: string) => void;
+  removeCourses: (ids: string[]) => void;
   removeTopic: (cid: string, topicId: string) => void;
   setRole: (id: string, role: Kind) => boolean;
   saveUser: (id: string | null, u: UserDraft) => string | null;
@@ -68,8 +69,12 @@ const PortalCtx = createContext<Ctx | null>(null);
 /** Marks the draft's topics for its attendees; returns the toast text, or null if nothing valid to save. */
 function applySession(s: State, d: SessionDraft): string | null {
   const c = s.courses.find((x) => x.id === d.courseId);
-  const attendees = d.traineeIds.filter((tid) => isAssigned(s, tid, d.courseId));
+  // anyone in the directory can attend; people not yet on the course are assigned to it
+  const known = new Set([...s.admins, ...s.trainers, ...s.trainees].map((p) => p.id));
+  const attendees = d.traineeIds.filter((tid) => known.has(tid));
   if (!c || !attendees.length || !d.topicIds.length) return null;
+  for (const tid of attendees)
+    if (!isAssigned(s, tid, c.id)) s.assignments.push({ id: uid('a'), traineeId: tid, courseId: c.id, assignedOn: today(), due: '' });
   const id = uid('s');
   let newMarks = 0;
   let kept = 0;
@@ -322,6 +327,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       toast('Course removed');
     };
 
+    const removeCourses: Ctx['removeCourses'] = (ids) => {
+      const gone = new Set(ids);
+      update((s) => {
+        s.courses = s.courses.filter((c) => !gone.has(c.id));
+        s.assignments = s.assignments.filter((a) => !gone.has(a.courseId));
+        for (const k of Object.keys(s.progress)) if (gone.has(k.split('|')[1])) delete s.progress[k];
+        s.sessions = s.sessions.filter((x) => !gone.has(x.courseId));
+      });
+      toast(`${ids.length} ${ids.length === 1 ? 'course' : 'courses'} removed`);
+    };
+
     const removeTopic: Ctx['removeTopic'] = (cid, topicId) => {
       update((s) => {
         const c = s.courses.find((x) => x.id === cid);
@@ -462,7 +478,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return { added: fresh.length, skipped };
     };
 
-    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
+    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeCourses, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update, toast]);
 

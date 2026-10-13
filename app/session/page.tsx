@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
-import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey, trainerNames } from '@/lib/selectors';
+import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { today, validPastOrToday } from '@/lib/util';
 import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
@@ -35,6 +35,13 @@ export default function SessionPage() {
   const myName = me?.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.name : undefined;
   const c = S.courses.find((x) => x.id === courseId);
   const scope = new Set(scopeTrainees(S, me).map((t) => t.id));
+  // everyone in the directory: roles change, so anyone can deliver or attend
+  const everyone = [
+    ...S.admins.map((p) => ({ id: p.id, name: p.name, tone: '', label: 'Admin' })),
+    ...S.trainers.map((p) => ({ id: p.id, name: p.name, tone: p.tone, label: p.specialty ? `Trainer · ${p.specialty}` : 'Trainer' })),
+    ...S.trainees.map((p) => ({ id: p.id, name: p.name, tone: p.tone, label: p.jobRole ? `Trainee · ${p.jobRole}` : 'Trainee' })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  const deliverers = [...new Set(everyone.map((p) => p.name))];
 
   const startCourse = (id: string) => {
     const cc = S.courses.find((x) => x.id === id);
@@ -71,7 +78,7 @@ export default function SessionPage() {
     );
   }
 
-  const eligible = S.trainees.filter((t) => isAssigned(S, t.id, c.id) && scope.has(t.id));
+  const eligible = everyone;
   const selected = new Set(traineeIds);
   const chosen = new Set(topicIds);
   const names = eligible.filter((t) => selected.has(t.id)).map((t) => t.name);
@@ -84,7 +91,7 @@ export default function SessionPage() {
   const toggle = <T,>(list: T[], v: T, on: boolean) => (on ? [...new Set([...list, v])] : list.filter((x) => x !== v));
 
   const save = () => {
-    const attendees = traineeIds.filter((tid) => isAssigned(S, tid, c.id));
+    const attendees = traineeIds;
     if (!attendees.length || !topicIds.length) return toast('Choose a course, at least one attendee, and a topic');
     if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
     const msg = saveSession({ courseId: c.id, trainer: trainer || primaryOf(c), date, traineeIds: attendees, topicIds, updateExisting });
@@ -114,7 +121,7 @@ export default function SessionPage() {
             <div className="field">
               <label htmlFor="s-tr">Trainer who delivered this session</label>
               <select id="s-tr" className="select" style={{ width: '100%' }} value={trainer || primaryOf(c)} onChange={(e) => setTrainer(e.target.value)}>
-                {trainerNames(S, trainer || primaryOf(c)).map((n) => <option key={n}>{n}</option>)}
+                {(deliverers.includes(trainer || primaryOf(c)) ? deliverers : [trainer || primaryOf(c), ...deliverers]).map((n) => <option key={n}>{n}</option>)}
               </select>
             </div>
             <div className="field">
@@ -125,12 +132,12 @@ export default function SessionPage() {
         </section>
 
         <section className="card detail-panel">
-          <SectionTitle title="2 · Who is attending?" sub="All assigned trainees are selected by default. Remove anyone absent from the dropdown." />
+          <SectionTitle title="2 · Who is attending?" sub="Assigned trainees are selected by default. Remove anyone absent, or add anyone else from the list. Anyone not yet on this course is assigned when you save." />
           <div className="attendee-picker" ref={picker}>
             <button type="button" className="attendee-trigger" aria-expanded={menuOpen} aria-controls="attendeeMenu" onClick={() => setMenuOpen((o) => !o)}>
               <span className="attendee-trigger-copy">
                 <b>{selected.size} of {eligible.length} selected</b>
-                <small>{names.join(', ') || (eligible.length ? 'Choose trainees' : 'No trainees assigned')}</small>
+                <small>{names.join(', ') || (eligible.length ? 'Choose attendees' : 'No users yet')}</small>
               </span>
               <span className="attendee-chevron">⌄</span>
             </button>
@@ -149,12 +156,12 @@ export default function SessionPage() {
                       <input type="checkbox" checked={selected.has(t.id)} onChange={(e) => setTraineeIds((l) => toggle(l, t.id, e.target.checked))} />
                       <span className="attendee-identity">
                         <Avatar name={t.name} tone={t.tone} />
-                        <span><b>{t.name}</b><small>{t.jobRole} · {t.status}</small></span>
+                        <span><b>{t.name}</b><small>{t.label}</small></span>
                       </span>
-                      <em>{statCourse(S, t.id, c).done}/{c.topics.length} done</em>
+                      <em>{isAssigned(S, t.id, c.id) ? `${statCourse(S, t.id, c).done}/${c.topics.length} done` : 'Not assigned'}</em>
                     </label>
                   ))}
-                  {!eligible.length && <div className="empty">No trainees are assigned to this course yet.</div>}
+                  {!eligible.length && <div className="empty">No users have been added yet.</div>}
                 </div>
               </div>
             )}
