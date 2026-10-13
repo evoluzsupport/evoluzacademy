@@ -228,7 +228,13 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const [trainer, setTrainer] = useState('');
   void me;
 
-  const trainees = S.trainees.filter((t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))));
+  // anyone can be a learner: trainees, and trainers or admins taking a course themselves
+  const everyone = [
+    ...S.trainees.map((t) => ({ id: t.id, name: t.name, label: t.jobRole || 'Trainee' })),
+    ...S.trainers.map((t) => ({ id: t.id, name: t.name, label: 'Trainer' })),
+    ...S.admins.map((t) => ({ id: t.id, name: t.name, label: 'Admin' })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  const trainees = everyone.filter((t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
 
   const submit = (e: FormEvent) => {
@@ -243,10 +249,10 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
       <p>Their topic progress starts separately for each learning path.</p>
       <form onSubmit={submit}>
         <div className="form-grid">
-          <Field label="Trainee" full>
+          <Field label="Learner" full>
             <select value={tid} onChange={(e) => setTid(e.target.value)} disabled={!!traineeId} required>
-              <option value="">Select trainee…</option>
-              {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.jobRole}</option>)}
+              <option value="">Select learner…</option>
+              {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}</option>)}
             </select>
           </Field>
           <Field label="Course" full>

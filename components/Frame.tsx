@@ -14,7 +14,7 @@ interface NavItem {
   label: string;
   icon: string;
 }
-const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
+const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: NavItem[] }> = {
   admin: {
     workspace: [
       { href: '/', label: 'Overview', icon: '⌂' },
@@ -35,9 +35,13 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
       { href: '/', label: 'Overview', icon: '⌂' },
       { href: '/trainees', label: 'My Trainee', icon: '♙' },
       { href: '/my-courses', label: 'My Courses', icon: '▤' },
-      { href: '/study', label: 'My Study', icon: '✎' },
+      { href: '/study', label: 'Self Learning', icon: '✎' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
+    ],
+    assigned: [
+      { href: '/my-trainer', label: 'My Trainer', icon: '♧' },
+      { href: '/assigned-courses', label: 'Assigned Course', icon: '▤' },
     ],
     insights: [{ href: '/analytics', label: 'Analytics', icon: '◔' }],
   },
@@ -46,7 +50,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
       { href: '/', label: 'Overview', icon: '⌂' },
       { href: '/tracker', label: 'My Course', icon: '▤' },
       { href: '/trainers', label: 'My Trainer', icon: '♧' },
-      { href: '/study', label: 'My Study', icon: '✎' },
+      { href: '/study', label: 'Self Learning', icon: '✎' },
     ],
     insights: [],
   },
@@ -187,7 +191,7 @@ export default function Frame({ children }: { children: ReactNode }) {
 
   const nav = NAV[me.kind];
   const active = (href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
-  const current = [...nav.workspace, ...nav.insights, { href: '/profile', label: 'My profile', icon: '' }].find((n) => active(n.href));
+  const current = [...nav.workspace, ...(nav.assigned ?? []), ...nav.insights, { href: '/profile', label: 'My profile', icon: '' }].find((n) => active(n.href));
   const mine = me.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.tone : me.kind === 'trainee' ? S.trainees.find((t) => t.id === me.id)?.tone : '';
 
   const search = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -217,6 +221,12 @@ export default function Frame({ children }: { children: ReactNode }) {
         </div>
         <div className="nav-label">Workspace</div>
         <nav className="nav">{nav.workspace.map(link)}</nav>
+        {nav.assigned && nav.assigned.length > 0 && (
+          <>
+            <div className="nav-label" style={{ marginTop: 17 }}>Assigned Items</div>
+            <nav className="nav">{nav.assigned.map(link)}</nav>
+          </>
+        )}
         {nav.insights.length > 0 && (
           <>
             <div className="nav-label" style={{ marginTop: 17 }}>Insights</div>

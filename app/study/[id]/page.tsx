@@ -15,7 +15,7 @@ export default function StudyCourse() {
   if (!c) {
     return (
       <Guard kinds={['trainer', 'trainee']}>
-        <section className="card empty">Course not found. <Link href="/study" style={{ color: '#3158b6' }}>Back to My Study</Link></section>
+        <section className="card empty">Course not found. <Link href="/study" style={{ color: '#3158b6' }}>Back to Self Learning</Link></section>
       </Guard>
     );
   }
@@ -26,7 +26,7 @@ export default function StudyCourse() {
 
   return (
     <Guard kinds={['trainer', 'trainee']}>
-      <Link href="/study" className="subtle" style={{ display: 'inline-block', marginBottom: 10 }}>← Back to My Study</Link>
+      <Link href="/study" className="subtle" style={{ display: 'inline-block', marginBottom: 10 }}>← Back to Self Learning</Link>
       <PageHead title={c.name} desc={`${c.group} · ${c.duration} · ${topics.length} topics`} />
       <section className="card detail-panel" style={{ marginBottom: 16 }}>
         <SectionTitle title="My progress" right={<span className="subtle">{done} of {topics.length} topics complete</span>} />

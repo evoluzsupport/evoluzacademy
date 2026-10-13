@@ -18,8 +18,8 @@ export function MyStudyCard() {
   return (
     <section className="card section-card" style={{ marginTop: 18 }}>
       <SectionTitle
-        title="My Study"
-        right={<Link href="/study" style={{ color: '#4569bf', fontSize: 11, fontWeight: 700 }}>Open My Study →</Link>}
+        title="Self Learning"
+        right={<Link href="/study" style={{ color: '#4569bf', fontSize: 11, fontWeight: 700 }}>Open Self Learning →</Link>}
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
         {tiles.map(([k, v]) => (
@@ -42,7 +42,7 @@ export function MyStudyCard() {
           ))}
         </div>
       ) : (
-        <Empty>You have not started a course yet. Open My Study to begin.</Empty>
+        <Empty>You have not started a course yet. Open Self Learning to begin.</Empty>
       )}
     </section>
   );

@@ -12,8 +12,14 @@ export default function AssignmentsPage() {
   const { S, openModal, confirm, unassign, update, toast } = usePortal();
   const [q, setQ] = useState('');
 
+  // learners can be trainees, or trainers/admins taking a course themselves
+  const people = [
+    ...S.trainees,
+    ...S.trainers.map((p) => ({ ...p, jobRole: 'Trainer', status: 'Active' as const, trainer: '', joined: '' })),
+    ...S.admins.map((p) => ({ ...p, jobRole: 'Admin', status: 'Active' as const, trainer: '', joined: '', tone: '' })),
+  ];
   const rows = S.assignments
-    .map((a) => ({ a, t: S.trainees.find((x) => x.id === a.traineeId), c: S.courses.find((x) => x.id === a.courseId) }))
+    .map((a) => ({ a, t: people.find((x) => x.id === a.traineeId), c: S.courses.find((x) => x.id === a.courseId) }))
     .filter((x) => x.t && x.c)
     .filter((x) => match(q, x.t!.name, x.c!.name, x.a.trainer, x.t!.trainer));
 
@@ -67,7 +73,13 @@ export default function AssignmentsPage() {
                 const overdue = isOverdue(a.due, st.pct);
                 return (
                   <tr key={a.id}>
-                    <td><Link className="person" href={`/trainees/${t!.id}`}><Avatar name={t!.name} tone={t!.tone} />{t!.name}</Link></td>
+                    <td>
+                      {S.trainees.some((x) => x.id === t!.id) ? (
+                        <Link className="person" href={`/trainees/${t!.id}`}><Avatar name={t!.name} tone={t!.tone} />{t!.name}</Link>
+                      ) : (
+                        <div className="person"><Avatar name={t!.name} tone={t!.tone} />{t!.name} <span className="pill neutral">{t!.jobRole}</span></div>
+                      )}
+                    </td>
                     <td>{c!.name}</td>
                     <td>
                       <select className="select" aria-label={`Trainer for ${t!.name}, ${c!.name}`} style={{ padding: '5px 7px', fontSize: 11, minWidth: 150 }} value={a.trainer ?? ''} onChange={(e) => setTrainer(a.id, e.target.value)}>

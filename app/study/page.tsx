@@ -19,7 +19,7 @@ export default function MyStudyPage() {
 
   return (
     <Guard kinds={['trainer', 'trainee']}>
-      <PageHead title="My Study" desc="Learn at your own pace. Pick any course and tick each topic as you finish it." />
+      <PageHead title="Self Learning" desc="Learn at your own pace. Pick any course and tick each topic as you finish it." />
       <div className="toolbar" style={{ marginBottom: 15 }}>
         <input className="input" placeholder="Search courses..." aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="select" aria-label="Category" value={group} onChange={(e) => setGroup(e.target.value)}>
