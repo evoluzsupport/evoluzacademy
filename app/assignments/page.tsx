@@ -26,7 +26,7 @@ export default function AssignmentsPage() {
   return (
     <Guard kinds={['admin']}>
       <PageHead
-        title="Assignments"
+        title="Ongoing Training Session"
         desc="Which trainee is taking which course, with due dates to keep learning on schedule."
         actions={
           <>

@@ -15,7 +15,7 @@ const STEPS: Step[] = [
   { icon: '⌂', label: 'Overview', say: 'Start here: a live snapshot of every trainee, course and what needs attention today.' },
   { icon: '♙', label: 'Trainees & trainers', say: "Keep one directory of trainees and trainers, with each person's role and progress." },
   { icon: '▤', label: 'Courses', say: 'Build courses from planned days and topics. Import a whole curriculum from CSV.' },
-  { icon: '⇄', label: 'Assignments', say: 'Assign courses to trainees with due dates. Everyone learns at their own pace.' },
+  { icon: '⇄', label: 'Ongoing Training Session', say: 'Assign courses to trainees with due dates. Everyone learns at their own pace.' },
   { icon: '☑', label: 'Training tracker', say: 'Tick topics off as they happen. Progress stays individual, even when sessions move.' },
   { icon: '＋', label: 'Log a session', say: 'Ran a class? Log it once and mark the topics for every attendee in one go.' },
   { icon: '◔', label: 'Analytics', say: 'See completion, overdue courses and trainer delivery, and export it all to CSV.' },
