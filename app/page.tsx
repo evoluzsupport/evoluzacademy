@@ -8,6 +8,7 @@ import { primaryOf } from '@/lib/seed';
 import { fmtDate, isOverdue } from '@/lib/util';
 import { Avatar, COURSE_ICONS, COURSE_TONES, Empty, PageHead, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
 import { TraineeForm } from '@/components/forms';
+import { MyStudyCard } from '@/components/study';
 
 function Chart() {
   const { S, me } = usePortal();
@@ -211,5 +212,10 @@ function TraineeOverview() {
 export default function Overview() {
   const { me } = usePortal();
   if (!me) return null;
-  return me.kind === 'trainee' ? <TraineeOverview /> : <StaffOverview />;
+  return (
+    <>
+      {me.kind === 'trainee' ? <TraineeOverview /> : <StaffOverview />}
+      {me.kind !== 'admin' && <MyStudyCard />}
+    </>
+  );
 }
