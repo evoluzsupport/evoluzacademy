@@ -61,7 +61,7 @@ function UserForm({ id }: { id?: string }) {
 }
 
 export default function UsersPage() {
-  const { S, me, openModal, confirm, removeUser, addPeople, toast } = usePortal();
+  const { S, me, openModal, confirm, removeUser, addPeople, setRole, toast } = usePortal();
   const [q, setQ] = useState('');
   const [text, setText] = useState('');
   const [bulkAccess, setBulkAccess] = useState<Kind>('admin');
@@ -141,7 +141,18 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td>{p.email || <span className="subtle">No email · cannot sign in</span>}</td>
-                  <td><span className={`pill ${p.kind === 'admin' ? 'progress' : p.kind === 'trainer' ? 'active' : 'neutral'}`}>{p.kind[0].toUpperCase() + p.kind.slice(1)}</span></td>
+                  <td>
+                    <select
+                      className="select"
+                      aria-label={`Access for ${p.name}`}
+                      value={p.kind}
+                      disabled={p.id === me?.id}
+                      title={p.id === me?.id ? 'You cannot change your own access' : 'Change access'}
+                      onChange={(e) => setRole(p.id, e.target.value as Kind)}
+                    >
+                      {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                  </td>
                   <td>{p.title || '—'}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>

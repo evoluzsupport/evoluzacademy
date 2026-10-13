@@ -143,9 +143,18 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       if (bootedFor.current === userId) return;
       bootedFor.current = userId;
       try {
-        const p = await myProfile(userId);
+        let p;
+        try {
+          p = await myProfile(userId);
+        } catch (e) {
+          bootedFor.current = null;
+          toast(e instanceof Error ? e.message : 'Could not set up your account');
+          await supabase.auth.signOut();
+          return;
+        }
         if (!p) {
           bootedFor.current = null;
+          toast('Your account is not set up yet. Ask an admin to add your email.');
           await supabase.auth.signOut();
           return;
         }
@@ -207,8 +216,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   );
 
   const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-    return !error;
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    if (error || !data.user) return false;
+    // hold the app in its loading state until the profile and data arrive, so it never bounces back
+    if (bootedFor.current !== data.user.id) setReady(false);
+    return true;
   }, []);
 
   const loginWithZoho = useCallback(async () => {

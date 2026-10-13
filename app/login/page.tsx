@@ -23,6 +23,16 @@ export default function LoginPage() {
     if (ready && me) router.replace('/');
   }, [ready, me, router]);
 
+  // show why a Zoho sign-in failed (Supabase puts the reason in the URL)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, '') || window.location.search);
+    const why = params.get('error_description') || params.get('error');
+    if (why) {
+      setErr(decodeURIComponent(why.replace(/\+/g, ' ')));
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   const zoho = async () => {
     const m = await loginWithZoho();
     if (m) setErr(m);

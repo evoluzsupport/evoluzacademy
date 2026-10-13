@@ -2,6 +2,15 @@ import type { Assignment, Course, Me, State, Topic, Trainee } from './types';
 import { daySort, isOverdue } from './util';
 import { primaryOf } from './seed';
 
+/** True when a trainer field ("Jyoti Raj/ Shivangi Kumari") names the given person. */
+export const nameMatches = (value: string | undefined, name: string | undefined) => {
+  const n = String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!n) return false;
+  return String(value || '')
+    .split(/\s*(?:\/|&|,|;|\band\b)\s*/i)
+    .some((x) => x.toLowerCase().replace(/\s+/g, ' ').trim() === n);
+};
+
 export const topicKey = (tid: string, cid: string, topicId: string) => `${tid}|${cid}|${topicId}`;
 
 export const courseById = (S: State, id: string) => S.courses.find((c) => c.id === id);
@@ -46,13 +55,15 @@ export function scopeTrainees(S: State, me: Me | null): Trainee[] {
   if (!me) return [];
   if (me.kind === 'admin') return S.trainees;
   if (me.kind === 'trainee') return S.trainees.filter((t) => t.id === me.id);
-  const name = S.trainers.find((t) => t.id === me.id)?.name;
-  return S.trainees.filter(
-    (t) =>
-      t.trainer === name ||
-      S.assignments.some((a) => a.traineeId === t.id && primaryOf(courseById(S, a.courseId)) === name) ||
-      Object.entries(S.progress).some(([k, r]) => k.startsWith(t.id + '|') && r.trainer === name)
-  );
+  // a trainer sees the trainees on courses they lead or teach, or whose topics they delivered
+  const name = S.trainers.find((t) => t.id === me.id)?.name ?? me.name;
+  return S.trainees.filter((t) => {
+    if (t.id === me.id) return false;
+    if (nameMatches(t.trainer, name)) return true;
+    const mine = S.assignments.filter((a) => a.traineeId === t.id).map((a) => courseById(S, a.courseId));
+    if (mine.some((c) => c && (nameMatches(c.primaryTrainer, name) || c.topics.some((tp) => nameMatches(tp.trainer, name))))) return true;
+    return Object.entries(S.progress).some(([k, r]) => k.startsWith(t.id + '|') && nameMatches(r.trainer, name));
+  });
 }
 
 export function allStats(S: State, trainees: Trainee[]) {

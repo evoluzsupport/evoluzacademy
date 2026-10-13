@@ -308,5 +308,10 @@ export async function myProfile(authUserId: string) {
     .select('id,name,email,phone,role')
     .eq('auth_user_id', authUserId)
     .maybeSingle();
-  return data;
+  if (data) return data;
+  // not linked yet: link by email, or create a trainee for a new company email
+  const made = await supabase.rpc('ensure_profile');
+  if (made.error) throw new Error(made.error.message);
+  const p = made.data as { id: string; name: string; email: string | null; phone: string | null; role: string };
+  return p ? { id: p.id, name: p.name, email: p.email, phone: p.phone, role: p.role } : null;
 }

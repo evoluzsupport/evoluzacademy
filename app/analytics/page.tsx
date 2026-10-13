@@ -1,6 +1,6 @@
 'use client';
 import { usePortal } from '@/lib/store';
-import { allStats, assignedCourses, progressFor, scopeTrainees, statCourse } from '@/lib/selectors';
+import { allStats, assignedCourses, progressFor, nameMatches, scopeTrainees, statCourse } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { Avatar, Empty, Guard, PageHead, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
@@ -23,12 +23,12 @@ export default function AnalyticsPage() {
 
   const trainerRows = S.trainers
     .map((r) => {
-      const entries = Object.entries(S.progress).filter(([k, x]) => x.done && x.trainer === r.name && ids.has(k.split('|')[0]));
+      const entries = Object.entries(S.progress).filter(([k, x]) => x.done && nameMatches(x.trainer, r.name) && ids.has(k.split('|')[0]));
       return {
         r,
         delivered: entries.length,
         learners: new Set(entries.map(([k]) => k.split('|')[0])).size,
-        assigned: S.courses.filter((c) => primaryOf(c) === r.name).length,
+        assigned: S.courses.filter((c) => nameMatches(primaryOf(c), r.name)).length,
       };
     })
     .filter((x) => x.delivered || x.assigned)
