@@ -102,6 +102,5 @@ export function makeSeed(): State {
     assignments,
     progress,
     sessions: [],
-    study: {},
   };
 }

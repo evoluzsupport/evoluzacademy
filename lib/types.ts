@@ -85,8 +85,6 @@ export interface State {
   /** key: `${traineeId}|${courseId}|${topicId}` */
   progress: Record<string, ProgressRec>;
   sessions: Session[];
-  /** self-study ticks, key: `${userId}|${courseId}|${topicId}` */
-  study: Record<string, { date: string }>;
 }
 export interface Me {
   kind: Kind;

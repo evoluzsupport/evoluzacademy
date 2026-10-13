@@ -8,7 +8,6 @@ import { primaryOf } from '@/lib/seed';
 import { fmtDate, isOverdue } from '@/lib/util';
 import { Avatar, COURSE_ICONS, COURSE_TONES, Empty, PageHead, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
 import { TraineeForm } from '@/components/forms';
-import { MyStudyCard } from '@/components/study';
 
 function Chart() {
   const { S, me } = usePortal();
@@ -63,7 +62,7 @@ function StaffOverview() {
       />
       <div className="grid stats">
         <Stat label="Active trainees" icon="♙" note={<><span className="trend">+{recentJoins}</span> joined in the last 30 days</>}>{s.active}</Stat>
-        <Stat label={me?.kind === 'trainer' ? 'My courses' : 'Courses in library'} icon="▤" note={me?.kind === 'trainer' ? 'Assigned to you by an admin' : 'Across common, apps & role-based'}>{visibleCourses(S, me).length}</Stat>
+        <Stat label={me?.kind === 'trainer' ? 'Assigned Courses' : 'Courses in library'} icon="▤" note={me?.kind === 'trainer' ? 'Assigned to you by an admin' : 'Across common, apps & role-based'}>{visibleCourses(S, me).length}</Stat>
         <Stat label="Topics completed" icon="✓" note="Across all learner assignments">
           {s.done}
           <small style={{ font: "500 13px 'DM Sans'", color: '#98a3b2' }}> / {s.total}</small>
@@ -119,7 +118,7 @@ function StaffOverview() {
           </div>
         </section>
         <section className="card section-card">
-          <SectionTitle title="Popular learning paths" right={<Link href={me?.kind === 'trainer' ? '/my-courses' : '/courses'} style={{ color: '#4569bf', fontSize: 11, fontWeight: 700 }}>{me?.kind === 'trainer' ? 'My courses →' : 'Course library →'}</Link>} />
+          <SectionTitle title="Popular learning paths" right={<Link href={me?.kind === 'trainer' ? '/my-courses' : '/courses'} style={{ color: '#4569bf', fontSize: 11, fontWeight: 700 }}>{me?.kind === 'trainer' ? 'Assigned Courses →' : 'Course library →'}</Link>} />
           <div className="course-list">
             {[...visibleCourses(S, me)]
               .map((c) => ({ c, n: S.assignments.filter((a) => a.courseId === c.id).length }))
@@ -212,10 +211,5 @@ function TraineeOverview() {
 export default function Overview() {
   const { me } = usePortal();
   if (!me) return null;
-  return (
-    <>
-      {me.kind === 'trainee' ? <TraineeOverview /> : <StaffOverview />}
-      {me.kind !== 'admin' && <MyStudyCard />}
-    </>
-  );
+  return me.kind === 'trainee' ? <TraineeOverview /> : <StaffOverview />;
 }

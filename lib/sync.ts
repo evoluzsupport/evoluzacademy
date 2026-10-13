@@ -15,7 +15,6 @@ export const emptyState = (): State => ({
   assignments: [],
   progress: {},
   sessions: [],
-  study: {},
 });
 
 interface Table {
@@ -144,16 +143,6 @@ const TABLES: Table[] = [
         return { trainee_id, course_id, topic_id, done_on: r.date, trainer: r.trainer, session_id: r.sessionId ?? null };
       }),
   },
-  {
-    name: 'self_study',
-    pk: ['user_id', 'course_id', 'topic_id'],
-    order: ['user_id', 'course_id', 'topic_id'],
-    rows: (s) =>
-      Object.entries(s.study).map(([k, r]) => {
-        const [user_id, course_id, topic_id] = k.split('|');
-        return { user_id, course_id, topic_id, done_on: r.date };
-      }),
-  },
 ];
 
 const keyOf = (t: Table, r: Row) => t.pk.map((c) => String(r[c])).join('|');
@@ -232,7 +221,7 @@ async function fetchAll(t: Table): Promise<Row[]> {
 }
 
 export async function loadRemote(): Promise<State> {
-  const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress, study] = await Promise.all(
+  const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress] = await Promise.all(
     TABLES.map(fetchAll)
   );
   const s = emptyState();
@@ -311,7 +300,6 @@ export async function loadRemote(): Promise<State> {
     if (r.session_id) rec.sessionId = str(r.session_id);
     s.progress[`${r.trainee_id}|${r.course_id}|${r.topic_id}`] = rec;
   }
-  for (const r of study) s.study[`${r.user_id}|${r.course_id}|${r.topic_id}`] = { date: str(r.done_on) };
   return s;
 }
 

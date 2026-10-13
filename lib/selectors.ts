@@ -50,26 +50,6 @@ export function progressFor(S: State, t: Trainee): CourseStat {
   return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
-/** Self-study summary for one person: ticks they made themselves, across the whole library. */
-export function studyStats(S: State, userId: string) {
-  const per = S.courses
-    .map((c) => {
-      const done = c.topics.filter((t) => S.study[`${userId}|${c.id}|${t.id}`]).length;
-      return { course: c, done, total: c.topics.length, pct: c.topics.length ? Math.round((done / c.topics.length) * 100) : 0 };
-    })
-    .filter((x) => x.done > 0);
-  const done = per.reduce((n, x) => n + x.done, 0);
-  const total = per.reduce((n, x) => n + x.total, 0);
-  return {
-    perCourse: per,
-    started: per.length,
-    completed: per.filter((x) => x.total > 0 && x.done === x.total).length,
-    done,
-    total,
-    pct: total ? Math.round((done / total) * 100) : 0,
-  };
-}
-
 /** Courses a signed-in person works with: admins see all; a trainer sees only those an admin assigned to them. */
 export function visibleCourses(S: State, me: Me | null): Course[] {
   if (!me || me.kind !== 'trainer') return S.courses;

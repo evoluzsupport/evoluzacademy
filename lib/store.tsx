@@ -55,7 +55,6 @@ export interface Ctx {
   undoSession: (id: string) => void;
   removeTrainee: (id: string) => void;
   removeCourse: (id: string) => void;
-  toggleStudy: (courseId: string, topicId: string) => void;
   removeCourses: (ids: string[]) => void;
   removeTopic: (cid: string, topicId: string) => void;
   setRole: (id: string, role: Kind) => boolean;
@@ -356,19 +355,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         s.courses = s.courses.filter((c) => c.id !== id);
         s.assignments = s.assignments.filter((a) => a.courseId !== id);
         for (const k of Object.keys(s.progress)) if (k.split('|')[1] === id) delete s.progress[k];
-        for (const k of Object.keys(s.study)) if (k.split('|')[1] === id) delete s.study[k];
       });
       toast('Course removed');
-    };
-
-    const toggleStudy: Ctx['toggleStudy'] = (courseId, topicId) => {
-      const uid = myId.current;
-      if (!uid) return;
-      const key = `${uid}|${courseId}|${topicId}`;
-      update((s) => {
-        if (s.study[key]) delete s.study[key];
-        else s.study[key] = { date: today() };
-      });
     };
 
     const removeCourses: Ctx['removeCourses'] = (ids) => {
@@ -377,7 +365,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         s.courses = s.courses.filter((c) => !gone.has(c.id));
         s.assignments = s.assignments.filter((a) => !gone.has(a.courseId));
         for (const k of Object.keys(s.progress)) if (gone.has(k.split('|')[1])) delete s.progress[k];
-        for (const k of Object.keys(s.study)) if (gone.has(k.split('|')[1])) delete s.study[k];
         s.sessions = s.sessions.filter((x) => !gone.has(x.courseId));
       });
       toast(`${ids.length} ${ids.length === 1 ? 'course' : 'courses'} removed`);
@@ -389,7 +376,6 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         if (!c) return;
         c.topics = c.topics.filter((t) => t.id !== topicId);
         for (const k of Object.keys(s.progress)) if (k.endsWith('|' + cid + '|' + topicId)) delete s.progress[k];
-        for (const k of Object.keys(s.study)) if (k.endsWith('|' + cid + '|' + topicId)) delete s.study[k];
       });
       toast('Topic removed');
     };
@@ -529,7 +515,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return { added: fresh.length, skipped };
     };
 
-    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeCourses, toggleStudy, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
+    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeCourses, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update, toast]);
 

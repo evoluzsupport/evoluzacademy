@@ -14,9 +14,9 @@ export default function MyCoursesPage() {
 
   return (
     <Guard kinds={['trainer']}>
-      <PageHead title="My Courses" desc="The courses an admin has assigned to you as trainer." />
+      <PageHead title="Assigned Courses" desc="The courses an admin has assigned to you as trainer." />
       <div className="toolbar" style={{ marginBottom: 15 }}>
-        <input className="input" placeholder="Search my courses..." aria-label="Search my courses" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input" placeholder="Search courses..." aria-label="Search assigned courses" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="subtle">{list.length} {list.length === 1 ? 'course' : 'courses'}</span>
       </div>
       <section className="card table-card">

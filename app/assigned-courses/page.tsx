@@ -21,7 +21,7 @@ export default function AssignedCoursesPage() {
 
   return (
     <Guard kinds={['trainer']}>
-      <PageHead title="Assigned Course" desc="Courses an admin has assigned to you as a learner, with your progress and trainer." />
+      <PageHead title="My Course" desc="Courses an admin has assigned to you as a learner, with your progress and trainer." />
 
       <section className="card table-card" style={{ marginBottom: 16 }}>
         <div style={{ padding: '14px 15px 4px' }}>
