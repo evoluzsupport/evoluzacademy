@@ -6,12 +6,6 @@ import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 import './login-bg.css';
 
-const DEMO = [
-  ['Admin', 'admin@evoluz.tech', 'demo@123'],
-  ['Trainer', 'trainer@evoluz.tech', 'demo@123'],
-  ['Trainee', 'trainee@evoluz.tech', 'demo@123'],
-];
-
 export default function LoginPage() {
   const { login, loginWithZoho, ready, me } = usePortal();
   const router = useRouter();
@@ -73,14 +67,6 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-        <p className="subtle" style={{ margin: '18px 0 0' }}>Demo accounts:</p>
-        <div className="demo-row">
-          {DEMO.map(([label, em, pass]) => (
-            <button key={em} type="button" className="btn" onClick={() => { setEmail(em); setPw(pass); setErr(''); }}>
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );
