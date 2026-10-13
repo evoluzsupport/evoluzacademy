@@ -85,7 +85,7 @@ export default function TrainersPage() {
   return (
     <Guard kinds={['admin', 'trainee']}>
       <PageHead
-        title={me?.kind === 'trainee' ? 'My trainers' : 'Trainers'}
+        title={me?.kind === 'trainee' ? 'My Trainer' : 'Trainers'}
         desc="Everyone who leads or delivers training, including people whose access role is not Trainer."
         actions={
           isAdmin && (

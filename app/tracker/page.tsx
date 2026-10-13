@@ -35,7 +35,7 @@ function Tracker() {
   return (
     <>
       <PageHead
-        title={isTrainee ? 'My courses' : 'Training tracker'}
+        title={isTrainee ? 'My Course' : 'Training tracker'}
         desc={isTrainee ? 'Your courses, assigned trainers and progress. Your trainer updates your topics as you complete them.' : 'Individual topic status, actual trainer, and editable completion date.'}
         actions={!isTrainee && <Link className="btn primary" href="/session">＋ Log a group session</Link>}
       />
@@ -78,10 +78,13 @@ function Tracker() {
                   if (!cc) return null;
                   const st = statCourse(S, t.id, cc);
                   const overdue = isOverdue(a.due, st.pct);
+                  // the trainer set on the assignment, else the course's primary trainer, else the trainee's contact
+                  const real = (v?: string) => (v && v !== 'No Trainer Assigned' ? v : '');
+                  const assignedTrainer = real(a.trainer) || real(primaryOf(cc)) || real(t.trainer) || 'No Trainer Assigned';
                   return (
                     <tr key={a.id}>
                       <td><b>{cc.name}</b></td>
-                      <td>{a.trainer || 'No Trainer Assigned'}</td>
+                      <td><b>{assignedTrainer}</b></td>
                       <td>{primaryOf(cc)}</td>
                       <td>{fmtDate(a.assignedOn)}</td>
                       <td>{a.due ? fmtDate(a.due) : '—'}</td>
