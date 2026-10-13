@@ -79,17 +79,6 @@ export default function TrainersPage() {
       toast('Trainer removed');
     });
 
-  // trainee view: which of my assigned courses each trainer teaches me
-  const taughtBy = new Map<string, string[]>();
-  if (isTrainee && me) {
-    for (const a of S.assignments.filter((x) => x.traineeId === me.id)) {
-      const c = S.courses.find((x) => x.id === a.courseId);
-      if (!c) continue;
-      const who = names(a.trainer).length ? names(a.trainer) : names(primaryOf(c));
-      who.forEach((n) => taughtBy.set(norm(n), [...(taughtBy.get(norm(n)) ?? []), c.name]));
-    }
-  }
-
   const led = (r: Row) => S.courses.filter((c) => names(c.primaryTrainer).some((n) => norm(n) === norm(r.name))).length;
   const delivered = (r: Row) =>
     Object.values(S.progress).filter((x) => x.done && names(x.trainer).some((n) => norm(n) === norm(r.name))).length;
@@ -118,8 +107,7 @@ export default function TrainersPage() {
           <table className="table">
             <thead>
               <tr>
-                {isTrainee && <th>Assigned Course</th>}
-                <th>Trainer</th>
+                <th>{isTrainee ? 'Assigned Trainer' : 'Trainer'}</th>
                 <th>Role</th>
                 <th>Access</th>
                 <th>Email</th>
@@ -131,7 +119,6 @@ export default function TrainersPage() {
             <tbody>
               {list.map((r) => (
                 <tr key={r.id}>
-                  {isTrainee && <td><b>{(taughtBy.get(norm(r.name)) ?? []).join(', ') || '—'}</b></td>}
                   <td><div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div></td>
                   <td>{r.title || '—'}</td>
                   <td><span className={`pill ${r.kind === 'trainer' ? 'active' : r.kind === 'admin' ? 'progress' : 'neutral'}`}>{r.kind[0].toUpperCase() + r.kind.slice(1)}</span></td>
