@@ -1,13 +1,13 @@
 'use client';
 import { useRef } from 'react';
 import { usePortal } from '@/lib/store';
-import { downloadCSV, slug, TEMPLATE_COLUMNS, type ImportKind } from '@/lib/csv';
+import { downloadCSV, slug, TEMPLATE_COLUMNS, TEMPLATE_SAMPLES, type ImportKind } from '@/lib/csv';
 
 const LABELS: Record<ImportKind, string> = { trainees: 'Trainees', trainers: 'Trainers', curriculum: 'Curriculum', topics: 'Topics', users: 'Users' };
 const DESCRIPTIONS: Record<ImportKind, string> = {
   trainees: 'Download the column template, fill in your trainee rows, then import the completed CSV.',
   trainers: 'Download the column template, fill in your trainer rows, then import the completed CSV.',
-  curriculum: 'One row per topic. Repeat the course details for each topic row to import several courses at once.',
+  curriculum: 'One row per topic, in the same layout as the training manual: Course, Planned Day, Trainer Name, Category, Training Topic, What We Cover and Practical Activity / Assessment. Repeat the course name on each row to import several courses at once. The sample file shows example rows.',
   topics: 'Download a template for this course, then import its topic rows.',
   users: 'One row per person with Name, Email, Access (Admin, Trainer or Trainee), Role and Phone. People already listed by email are updated.',
 };
@@ -19,7 +19,7 @@ export function ImportDialog({ kind, courseId = '' }: { kind: ImportKind; course
 
   const template = () => {
     const name = kind === 'topics' ? slug(courseName || 'topics') + '-topics' : kind;
-    downloadCSV([TEMPLATE_COLUMNS[kind]], `evoluz-${name}-sample.csv`);
+    downloadCSV([TEMPLATE_COLUMNS[kind], ...TEMPLATE_SAMPLES[kind]], `evoluz-${name}-sample.csv`);
     toast('Sample file downloaded');
   };
   return (

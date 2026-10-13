@@ -85,6 +85,7 @@ const TABLES: Table[] = [
           day: t.day,
           trainer: t.trainer,
           topic: t.topic,
+          category: t.category ?? '',
           cover: t.cover,
           activity: t.activity,
           position: i,
@@ -248,6 +249,7 @@ export async function loadRemote(): Promise<State> {
       day: str(t.day),
       trainer: str(t.trainer),
       topic: str(t.topic),
+      category: str(t.category),
       cover: str(t.cover),
       activity: str(t.activity),
     });

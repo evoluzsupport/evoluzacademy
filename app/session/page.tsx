@@ -178,7 +178,12 @@ export default function SessionPage() {
             {orderedTopics(c).map((x) => (
               <label className="choice topic-choice" key={x.id}>
                 <input type="checkbox" checked={chosen.has(x.id)} onChange={(e) => setTopicIds((l) => toggle(l, x.id, e.target.checked))} />
-                <span><b>{x.topic}</b><small>{x.day} · {x.activity || x.cover}</small></span>
+                <span>
+                  <b>{x.topic}</b>
+                  <small>{x.day}{x.category ? ` · ${x.category}` : ''}</small>
+                  {x.cover && <small className="topic-line"><i>What we cover:</i> {x.cover}</small>}
+                  {x.activity && <small className="topic-line"><i>Activity:</i> {x.activity}</small>}
+                </span>
               </label>
             ))}
           </div>

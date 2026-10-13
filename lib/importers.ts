@@ -1,28 +1,26 @@
 import { field, type ImportKind, type Row } from './csv';
-import { primaryOf } from './seed';
 import type { Course, Kind, State, Topic, Trainee, Trainer } from './types';
 import { dayNumber, daySort, lc, today, uid } from './util';
 
 const normDay = (d: string) => (/^\d+$/.test(d) ? 'Day ' + Number(d) : d);
 
-function ensureTrainer(S: State, name: string, specialty: string) {
-  name = name.trim();
-  if (!name || S.trainers.some((t) => lc(t.name) === lc(name))) return;
-  S.trainers.push({ id: uid('r-import-'), name, specialty, email: '', password: '', tone: 'lilac' });
-}
+// Trainer names in a curriculum are labels, not accounts: people are managed on the Users page.
+export const NO_TRAINER_LABEL = 'No Trainer Assigned';
+const NO_TRAINER = /^no trainer assigned$/i;
+const cleanTrainer = (v: string | undefined) => (v && !NO_TRAINER.test(v.trim()) ? v.trim() : '');
 
 function upsertTopic(S: State, c: Course, row: Row, primary: string, trainerCols: string[]): boolean {
-  const name = field(row, 'Topic', 'Topic name', 'Name');
+  const name = field(row, 'Training Topic', 'Topic', 'Topic name', 'Name') || field(row, 'Category');
   if (!name) return false;
-  const day = normDay(field(row, 'Planned day', 'Day') || 'Day 1');
-  const trainer = field(row, ...trainerCols) || primary;
-  ensureTrainer(S, trainer, 'Imported topic trainer');
+  const day = normDay(field(row, 'Planned day', 'Day', 'Sequence') || 'Day 1');
+  const trainer = cleanTrainer(field(row, ...trainerCols)) || primary || NO_TRAINER_LABEL;
   const rec = {
     day,
     trainer,
     topic: name,
+    category: field(row, 'Category', 'Training Category') || '',
     cover: field(row, 'What we cover', 'Cover', 'Description') || '',
-    activity: field(row, 'Activity / assessment', 'Activity', 'Assessment') || '',
+    activity: field(row, 'Practical Activity / Assessment', 'Activity / assessment', 'Activity', 'Assessment') || '',
   };
   const matches = c.topics.filter((t) => lc(t.topic) === lc(name));
   const found = matches.find((t) => lc(t.day) === lc(day)) || (matches.length === 1 ? matches[0] : undefined);
@@ -148,9 +146,12 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
       if (!name) continue;
       const key = lc(name);
       let c = S.courses.find((x) => lc(x.name) === key);
-      const primary = field(row, 'Primary Trainer', 'Trainer') || (c ? primaryOf(c) : 'Project Manager');
-      ensureTrainer(S, primary, 'Primary trainer');
-      const category = field(row, 'Category', 'Group');
+      // course lead: explicit column, else the first row's trainer (first name when several are listed)
+      const explicit = cleanTrainer(field(row, 'Primary Trainer'));
+      const rowTrainer = cleanTrainer(field(row, 'Trainer Name', 'Trainer'));
+      const known = c && c.primaryTrainer && c.primaryTrainer !== NO_TRAINER_LABEL ? c.primaryTrainer : '';
+      const primary = explicit || known || rowTrainer.split(/\s*[/&,]\s*/)[0] || NO_TRAINER_LABEL;
+      const category = field(row, 'Group');
       const duration = field(row, 'Duration');
       if (c) {
         c.name = name;
@@ -165,7 +166,7 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
         seen.add(key);
         curriculumCourses++;
       }
-      if (upsertTopic(S, c, row, primary, ['Topic Trainer', 'Trainer'])) curriculumTopics++;
+      if (upsertTopic(S, c, row, explicit, ['Topic Trainer', 'Trainer Name', 'Trainer'])) curriculumTopics++;
       count++;
     }
   } else {
@@ -177,7 +178,7 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
         skipped++;
         continue;
       }
-      if (upsertTopic(S, c, row, primaryOf(c), ['Trainer'])) count++;
+      if (upsertTopic(S, c, row, '', ['Trainer Name', 'Trainer'])) count++;
     }
   }
 

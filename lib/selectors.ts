@@ -115,8 +115,10 @@ export function attentionItems(S: State, trainees: Trainee[]): Attention[] {
   return out;
 }
 
+/** Everyone in the directory can lead or deliver, since roles change. Keeps the current value selectable. */
 export const trainerNames = (S: State, selected?: string) => {
-  const names = S.trainers.map((r) => r.name);
+  const names = [...new Set([...S.admins, ...S.trainers, ...S.trainees].map((p) => p.name).filter(Boolean))].sort((x, y) => x.localeCompare(y));
+  names.unshift('No Trainer Assigned');
   if (selected && !names.includes(selected)) names.unshift(selected);
   return names;
 };

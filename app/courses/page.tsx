@@ -38,10 +38,10 @@ export default function CoursesPage() {
     );
 
   const exportCurriculum = () => {
-    const rows: string[][] = [['Course', 'Category', 'Duration', 'Primary Trainer', 'Planned day', 'Topic', 'What we cover', 'Activity / assessment', 'Topic Trainer']];
+    const rows: string[][] = [['Course', 'Planned Day', 'Trainer Name', 'Category', 'Training Topic', 'What We Cover', 'Practical Activity / Assessment', 'Group', 'Duration']];
     S.courses.forEach((c) => {
-      if (!c.topics.length) rows.push([c.name, c.group, c.duration, primaryOf(c), '', '', '', '', '']);
-      else c.topics.forEach((t) => rows.push([c.name, c.group, c.duration, primaryOf(c), t.day, t.topic, t.cover, t.activity, t.trainer || primaryOf(c)]));
+      if (!c.topics.length) rows.push([c.name, '', primaryOf(c), '', '', '', '', c.group, c.duration]);
+      else c.topics.forEach((t) => rows.push([c.name, t.day, t.trainer || primaryOf(c), t.category ?? '', t.topic, t.cover, t.activity, c.group, c.duration]));
     });
     downloadCSV(rows, 'evoluz-curriculum.csv');
   };
@@ -86,7 +86,7 @@ export default function CoursesPage() {
                 <th>Category</th>
                 <th>Duration</th>
                 <th>Topics</th>
-                <th>Lead trainer</th>
+                <th>Primary trainer</th>
                 <th>Learners</th>
               </tr>
             </thead>

@@ -13,7 +13,7 @@ type RawCourse = {
 
 const firstName = (v: string) => String(v || 'Project Manager').split(/[/,]/)[0].trim() || 'Project Manager';
 
-export const primaryOf = (c?: Pick<Course, 'primaryTrainer'>) => c?.primaryTrainer || 'Project Manager';
+export const primaryOf = (c?: Pick<Course, 'primaryTrainer'>) => c?.primaryTrainer || 'No Trainer Assigned';
 
 export function curriculum(): Course[] {
   return (raw as RawCourse[]).map((c) => {

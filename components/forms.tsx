@@ -115,7 +115,7 @@ export function CourseForm({ id }: { id?: string }) {
   const [name, setName] = useState(ex?.name ?? '');
   const [group, setGroup] = useState(ex?.group ?? 'Common');
   const [duration, setDuration] = useState(ex?.duration ?? '30 days');
-  const [lead, setLead] = useState(ex ? primaryOf(ex) : 'Project Manager');
+  const [lead, setLead] = useState(ex ? primaryOf(ex) : 'No Trainer Assigned');
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

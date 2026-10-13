@@ -48,3 +48,6 @@ html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avata
 @keyframes toast-in{from{opacity:0;transform:translate(-50%,-46%)}to{opacity:1;transform:translate(-50%,-50%)}}
 .row-check{width:16px;height:16px;accent-color:#3158b6;cursor:pointer}
 .list-link{font-weight:700;color:#26344b}.list-link:hover{color:#294fae}
+
+.topic-choice small.topic-line{display:block;margin-top:3px;line-height:1.5;white-space:normal}
+.topic-choice small.topic-line i{font-style:normal;font-weight:700;color:#5a6a85}

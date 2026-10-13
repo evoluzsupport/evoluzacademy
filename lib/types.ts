@@ -6,6 +6,8 @@ export interface Topic {
   day: string;
   trainer: string;
   topic: string;
+  /** optional grouping from the training manual, e.g. "Setup" */
+  category?: string;
   cover: string;
   activity: string;
 }
