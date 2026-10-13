@@ -14,7 +14,7 @@ const ACCESS: { value: Kind; label: string }[] = [
 ];
 
 function UserForm({ id }: { id?: string }) {
-  const { S, saveUser, closeModal, toast } = usePortal();
+  const { S, me, saveUser, closeModal, toast } = usePortal();
   const admin = S.admins.find((x) => x.id === id);
   const trainer = S.trainers.find((x) => x.id === id);
   const trainee = S.trainees.find((x) => x.id === id);
@@ -42,7 +42,7 @@ function UserForm({ id }: { id?: string }) {
           <div className="field"><label htmlFor="u-e">Email</label><input id="u-e" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
           <div className="field">
             <label htmlFor="u-a">Access</label>
-            <select id="u-a" value={access} onChange={(e) => setAccess(e.target.value as Kind)}>
+            <select id="u-a" value={access} disabled={!!id && id === me?.id} onChange={(e) => setAccess(e.target.value as Kind)}>
               {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>

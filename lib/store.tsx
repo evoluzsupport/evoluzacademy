@@ -119,6 +119,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const S0 = useRef(S);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const bootedFor = useRef<string | null>(null);
+  const myId = useRef<string | null>(null);
 
   const toast = useCallback((m: string) => {
     setToastMsg(m);
@@ -198,6 +199,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     () => (remoteMe ? findMe(S, remoteMe.kind, remoteMe.id) ?? remoteMe : null),
     [S, remoteMe]
   );
+  myId.current = remoteMe?.id ?? null;
 
   const update = useCallback(
     (fn: (s: State) => void) => {
@@ -383,6 +385,10 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       if (!who) return false;
       const was: Kind = cur.admins.some((a) => a.id === id) ? 'admin' : cur.trainers.some((t) => t.id === id) ? 'trainer' : 'trainee';
       if (was === role) return true;
+      if (id === myId.current) {
+        toast('You cannot change your own access. Ask another admin.');
+        return false;
+      }
       if (was === 'admin' && cur.admins.length <= 1) {
         toast('There must be at least one admin');
         return false;
@@ -419,6 +425,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       const all = [...cur.admins, ...cur.trainers, ...cur.trainees];
       if (all.some((p) => p.id !== id && p.email.toLowerCase() === email)) return 'That email is already in use';
       const was: Kind | null = !id ? null : cur.admins.some((a) => a.id === id) ? 'admin' : cur.trainers.some((t) => t.id === id) ? 'trainer' : 'trainee';
+      if (id && id === myId.current && was && u.access !== was) return 'You cannot change your own access. Ask another admin.';
       if (was === 'admin' && u.access !== 'admin' && cur.admins.length <= 1) return 'There must be at least one admin';
       const prev = id ? (all.find((p) => p.id === id) as Partial<Trainer & Trainee> | undefined) : undefined;
       const newId = id ?? uid(u.access === 'admin' ? 'ad-' : u.access === 'trainer' ? 'r-' : 't-');
