@@ -135,6 +135,15 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     try {
       adopt(await loadRemote());
+      // an admin may have changed this person's access: pick up the new role
+      const uid = bootedFor.current;
+      const p = uid ? await myProfile(uid) : null;
+      if (p)
+        setRemoteMe((cur) =>
+          cur && cur.kind === p.role && cur.name === p.name
+            ? cur
+            : { kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined }
+        );
     } catch {}
   }, [adopt]);
 
