@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { usePortal } from '@/lib/store';
-import { attentionItems, scopeTrainees } from '@/lib/selectors';
+import { attentionItems, scopeTrainees, visibleCourses } from '@/lib/selectors';
 import type { Kind } from '@/lib/types';
 import { initials } from '@/lib/util';
 
@@ -34,7 +34,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
     workspace: [
       { href: '/', label: 'Overview', icon: '⌂' },
       { href: '/trainees', label: 'My trainees', icon: '♙' },
-      { href: '/courses', label: 'Courses', icon: '▤' },
+      { href: '/my-courses', label: 'My Courses', icon: '▤' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
     ],
@@ -194,7 +194,7 @@ export default function Frame({ children }: { children: ReactNode }) {
     if (!q) return;
     const t = scopeTrainees(S, me).find((x) => (x.name + x.email).toLowerCase().includes(q));
     if (t) return router.push(`/trainees/${t.id}`);
-    const c = S.courses.find((x) => x.name.toLowerCase().includes(q));
+    const c = visibleCourses(S, me).find((x) => x.name.toLowerCase().includes(q));
     if (c) return router.push(`/courses/${c.id}`);
     toast('No trainee or course matches that search');
   };

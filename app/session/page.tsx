@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
-import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey } from '@/lib/selectors';
+import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey, visibleCourses } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { today, validPastOrToday } from '@/lib/util';
 import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
@@ -34,7 +34,8 @@ export default function SessionPage() {
   }, [menuOpen]);
 
   const myName = me?.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.name : undefined;
-  const c = S.courses.find((x) => x.id === courseId);
+  const myCourses = visibleCourses(S, me);
+  const c = myCourses.find((x) => x.id === courseId);
   const scope = new Set(scopeTrainees(S, me).map((t) => t.id));
   // everyone in the directory: roles change, so anyone can deliver or attend
   const everyone = [
@@ -45,7 +46,7 @@ export default function SessionPage() {
   const deliverers = [...new Set(everyone.map((p) => p.name))];
 
   const startCourse = (id: string) => {
-    const cc = S.courses.find((x) => x.id === id);
+    const cc = myCourses.find((x) => x.id === id);
     setCourseId(id);
     setTrainer(cc ? (myName ?? primaryOf(cc)) : '');
     setDate(today());
@@ -71,7 +72,7 @@ export default function SessionPage() {
             <label htmlFor="s-course">Course</label>
             <select id="s-course" className="select" style={{ width: '100%' }} value="" onChange={(e) => startCourse(e.target.value)}>
               <option value="">Choose a course…</option>
-              {S.courses.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              {myCourses.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           </div>
         </section>
@@ -116,7 +117,7 @@ export default function SessionPage() {
             <div className="field full">
               <label htmlFor="s-c2">Course</label>
               <select id="s-c2" className="select" style={{ width: '100%' }} value={c.id} onChange={(e) => startCourse(e.target.value)}>
-                {S.courses.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                {myCourses.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               </select>
             </div>
             <div className="field">

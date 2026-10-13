@@ -1,6 +1,6 @@
 'use client';
 import { usePortal } from '@/lib/store';
-import { allStats, assignedCourses, progressFor, nameMatches, scopeTrainees, statCourse } from '@/lib/selectors';
+import { allStats, assignedCourses, progressFor, nameMatches, scopeTrainees, statCourse, visibleCourses } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { Avatar, Empty, Guard, PageHead, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
@@ -11,7 +11,7 @@ export default function AnalyticsPage() {
   const ids = new Set(trainees.map((t) => t.id));
   const s = allStats(S, trainees);
 
-  const courseRows = S.courses
+  const courseRows = visibleCourses(S, me)
     .map((c) => {
       const ts = S.assignments.filter((a) => a.courseId === c.id && ids.has(a.traineeId)).map((a) => a.traineeId);
       const total = ts.length * c.topics.length;

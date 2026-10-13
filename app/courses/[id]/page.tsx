@@ -6,6 +6,7 @@ import { orderedTopics, scopeTrainees, statCourse, topicKey } from '@/lib/select
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV, slug } from '@/lib/csv';
 import { Avatar, Empty, Guard, Pill, ProgressBar, SectionTitle } from '@/components/ui';
+import { visibleCourses } from '@/lib/selectors';
 import { AssignDialog, CourseForm, TopicForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
 import { TopicDetails } from '@/components/topic';
@@ -14,13 +15,13 @@ export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const { S, me, openModal, confirm, removeCourse, removeTopic } = usePortal();
   const router = useRouter();
-  const c = S.courses.find((x) => x.id === id);
+  const c = visibleCourses(S, me).find((x) => x.id === id);
   const isAdmin = me?.kind === 'admin';
 
   if (!c) {
     return (
       <Guard kinds={['admin', 'trainer']}>
-        <section className="card empty">Course not found. <Link href="/courses" style={{ color: '#3158b6' }}>Back to courses</Link></section>
+        <section className="card empty">Course not found. <Link href={me?.kind === 'trainer' ? '/my-courses' : '/courses'} style={{ color: '#3158b6' }}>Back to courses</Link></section>
       </Guard>
     );
   }

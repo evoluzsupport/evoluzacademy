@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePortal } from '@/lib/store';
 import {
-  allStats, assignedCourses, assignmentsOf, recentActivity, scopeTrainees, statCourse, progressFor, orderedTopics, topicKey,
+  allStats, assignedCourses, assignmentsOf, recentActivity, scopeTrainees, statCourse, progressFor, orderedTopics, topicKey, visibleCourses,
 } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { fmtDate, isOverdue } from '@/lib/util';
@@ -10,8 +10,8 @@ import { Avatar, COURSE_ICONS, COURSE_TONES, Empty, PageHead, Pill, ProgressBar,
 import { TraineeForm } from '@/components/forms';
 
 function Chart() {
-  const { S } = usePortal();
-  const rows = S.courses
+  const { S, me } = usePortal();
+  const rows = visibleCourses(S, me)
     .map((c) => {
       const ts = S.assignments.filter((a) => a.courseId === c.id).map((a) => a.traineeId);
       const total = ts.length * c.topics.length;
@@ -62,7 +62,7 @@ function StaffOverview() {
       />
       <div className="grid stats">
         <Stat label="Active trainees" icon="♙" note={<><span className="trend">+{recentJoins}</span> joined in the last 30 days</>}>{s.active}</Stat>
-        <Stat label="Courses in library" icon="▤" note="Across common, apps & role-based">{S.courses.length}</Stat>
+        <Stat label={me?.kind === 'trainer' ? 'My courses' : 'Courses in library'} icon="▤" note={me?.kind === 'trainer' ? 'Assigned to you by an admin' : 'Across common, apps & role-based'}>{visibleCourses(S, me).length}</Stat>
         <Stat label="Topics completed" icon="✓" note="Across all learner assignments">
           {s.done}
           <small style={{ font: "500 13px 'DM Sans'", color: '#98a3b2' }}> / {s.total}</small>
@@ -118,9 +118,9 @@ function StaffOverview() {
           </div>
         </section>
         <section className="card section-card">
-          <SectionTitle title="Popular learning paths" right={<Link href="/courses" style={{ color: '#4569bf', fontSize: 11, fontWeight: 700 }}>Course library →</Link>} />
+          <SectionTitle title="Popular learning paths" right={<Link href={me?.kind === 'trainer' ? '/my-courses' : '/courses'} style={{ color: '#4569bf', fontSize: 11, fontWeight: 700 }}>{me?.kind === 'trainer' ? 'My courses →' : 'Course library →'}</Link>} />
           <div className="course-list">
-            {[...S.courses]
+            {[...visibleCourses(S, me)]
               .map((c) => ({ c, n: S.assignments.filter((a) => a.courseId === c.id).length }))
               .sort((a, b) => b.n - a.n)
               .slice(0, 4)

@@ -1,13 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { usePortal } from '@/lib/store';
+import { visibleCourses } from '@/lib/selectors';
 import { downloadCSV } from '@/lib/csv';
 import { fmtDate } from '@/lib/util';
 import { Empty, Guard, PageHead } from '@/components/ui';
 
 export default function SessionsPage() {
-  const { S, confirm, undoSession } = usePortal();
-  const list = [...S.sessions].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const { S, me, confirm, undoSession } = usePortal();
+  // trainers only see sessions for the courses assigned to them
+  const allowed = new Set(visibleCourses(S, me).map((c) => c.id));
+  const list = S.sessions.filter((x) => allowed.has(x.courseId)).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
 
   const exportCSV = () =>
     downloadCSV(

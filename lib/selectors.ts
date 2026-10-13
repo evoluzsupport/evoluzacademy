@@ -50,6 +50,15 @@ export function progressFor(S: State, t: Trainee): CourseStat {
   return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
+/** Courses a signed-in person works with: admins see all; a trainer sees only those an admin assigned to them. */
+export function visibleCourses(S: State, me: Me | null): Course[] {
+  if (!me || me.kind !== 'trainer') return S.courses;
+  const name = S.trainers.find((t) => t.id === me.id)?.name ?? me.name;
+  return S.courses.filter(
+    (c) => nameMatches(c.primaryTrainer, name) || S.assignments.some((a) => a.courseId === c.id && nameMatches(a.trainer, name))
+  );
+}
+
 /** Trainees a signed-in person is allowed to see. */
 export function scopeTrainees(S: State, me: Me | null): Trainee[] {
   if (!me) return [];

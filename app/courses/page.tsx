@@ -47,7 +47,7 @@ export default function CoursesPage() {
   };
 
   return (
-    <Guard kinds={['admin', 'trainer']}>
+    <Guard kinds={['admin']}>
       <PageHead
         title="Course library"
         desc="Build distinct learning paths from the shared foundation to role-specific practice."
