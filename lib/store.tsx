@@ -134,6 +134,15 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     try {
+      // if this tab's session was ended elsewhere, say so instead of showing an empty app
+      const { data: who, error: whoErr } = await supabase.auth.getUser();
+      if (whoErr || !who.user) {
+        if (bootedFor.current) {
+          setToastMsg('Your session ended. Please sign in again.');
+          await supabase.auth.signOut({ scope: 'local' });
+        }
+        return;
+      }
       adopt(await loadRemote());
       // an admin may have changed this person's access: pick up the new role
       const uid = bootedFor.current;
@@ -159,13 +168,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         } catch (e) {
           bootedFor.current = null;
           toast(e instanceof Error ? e.message : 'Could not set up your account');
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           return;
         }
         if (!p) {
           bootedFor.current = null;
           toast('Your account is not set up yet. Ask an admin to add your email.');
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'local' });
           return;
         }
         adopt(await loadRemote());
@@ -243,7 +252,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    void supabase.auth.signOut();
+    void supabase.auth.signOut({ scope: 'local' });
     setModal(null);
   }, []);
 
