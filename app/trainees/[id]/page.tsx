@@ -107,7 +107,7 @@ export default function TraineeDetail() {
                   </div>
                 }
               />
-              {topics.slice(0, 5).map((tp) => <TopicRow key={tp.id} traineeId={t.id} course={c} topic={tp} editable />)}
+              {topics.slice(0, 5).map((tp) => <TopicRow key={tp.id} traineeId={t.id} course={c} topic={tp} editable={me?.kind !== 'trainee'} />)}
               {topics.length > 5 && <Link className="btn" href={`/tracker?trainee=${t.id}&course=${c.id}`}>Open full tracker →</Link>}
             </section>
           );

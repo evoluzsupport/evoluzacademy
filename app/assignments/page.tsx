@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { match, usePortal } from '@/lib/store';
-import { statCourse } from '@/lib/selectors';
+import { statCourse, trainerNames } from '@/lib/selectors';
 import { downloadCSV } from '@/lib/csv';
 import { fmtDate, isOverdue } from '@/lib/util';
 import { Avatar, Empty, Guard, PageHead, Pill, ProgressBar } from '@/components/ui';
@@ -15,7 +15,15 @@ export default function AssignmentsPage() {
   const rows = S.assignments
     .map((a) => ({ a, t: S.trainees.find((x) => x.id === a.traineeId), c: S.courses.find((x) => x.id === a.courseId) }))
     .filter((x) => x.t && x.c)
-    .filter((x) => match(q, x.t!.name, x.c!.name, x.t!.trainer));
+    .filter((x) => match(q, x.t!.name, x.c!.name, x.a.trainer, x.t!.trainer));
+
+  const setTrainer = (id: string, trainer: string) => {
+    update((s) => {
+      const a = s.assignments.find((x) => x.id === id);
+      if (a) a.trainer = trainer;
+    });
+    toast(trainer ? `Trainer assigned: ${trainer}` : 'Trainer cleared');
+  };
 
   const setDue = (id: string, due: string) =>
     update((s) => {
@@ -34,7 +42,7 @@ export default function AssignmentsPage() {
               className="btn"
               onClick={() => {
                 downloadCSV(
-                  [['Trainee', 'Course', 'Assigned', 'Due', 'Progress %'], ...rows.map((x) => [x.t!.name, x.c!.name, x.a.assignedOn, x.a.due, statCourse(S, x.t!.id, x.c!).pct])],
+                  [['Trainee', 'Course', 'Trainer', 'Assigned', 'Due', 'Progress %'], ...rows.map((x) => [x.t!.name, x.c!.name, x.a.trainer || 'No Trainer Assigned', x.a.assignedOn, x.a.due, statCourse(S, x.t!.id, x.c!).pct])],
                   'evoluz-assignments.csv'
                 );
                 toast('CSV exported');
@@ -52,7 +60,7 @@ export default function AssignmentsPage() {
         </div>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Trainee</th><th>Course</th><th>Assigned</th><th>Due date</th><th>Progress</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Trainee</th><th>Course</th><th>Trainer</th><th>Assigned</th><th>Due date</th><th>Progress</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {rows.map(({ a, t, c }) => {
                 const st = statCourse(S, t!.id, c!);
@@ -61,6 +69,12 @@ export default function AssignmentsPage() {
                   <tr key={a.id}>
                     <td><Link className="person" href={`/trainees/${t!.id}`}><Avatar name={t!.name} tone={t!.tone} />{t!.name}</Link></td>
                     <td>{c!.name}</td>
+                    <td>
+                      <select className="select" aria-label={`Trainer for ${t!.name}, ${c!.name}`} style={{ padding: '5px 7px', fontSize: 11, minWidth: 150 }} value={a.trainer ?? ''} onChange={(e) => setTrainer(a.id, e.target.value)}>
+                        <option value="">No Trainer Assigned</option>
+                        {trainerNames(S, a.trainer || undefined).filter((n) => n !== 'No Trainer Assigned').map((n) => <option key={n}>{n}</option>)}
+                      </select>
+                    </td>
                     <td>{fmtDate(a.assignedOn)}</td>
                     <td>
                       <input className="input" type="date" aria-label={`Due date for ${t!.name}, ${c!.name}`} style={{ padding: '5px 7px', fontSize: 11 }} value={a.due} onChange={(e) => setDue(a.id, e.target.value)} />
@@ -71,7 +85,7 @@ export default function AssignmentsPage() {
                   </tr>
                 );
               })}
-              {!rows.length && <tr><td colSpan={7}><Empty>No assignments yet.</Empty></td></tr>}
+              {!rows.length && <tr><td colSpan={8}><Empty>No assignments yet.</Empty></td></tr>}
             </tbody>
           </table>
         </div>

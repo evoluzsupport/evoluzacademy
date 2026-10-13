@@ -60,6 +60,7 @@ export function scopeTrainees(S: State, me: Me | null): Trainee[] {
   return S.trainees.filter((t) => {
     if (t.id === me.id) return false;
     if (nameMatches(t.trainer, name)) return true;
+    if (S.assignments.some((a) => a.traineeId === t.id && nameMatches(a.trainer, name))) return true;
     const mine = S.assignments.filter((a) => a.traineeId === t.id).map((a) => courseById(S, a.courseId));
     if (mine.some((c) => c && (nameMatches(c.primaryTrainer, name) || c.topics.some((tp) => nameMatches(tp.trainer, name))))) return true;
     return Object.entries(S.progress).some(([k, r]) => k.startsWith(t.id + '|') && nameMatches(r.trainer, name));

@@ -49,7 +49,7 @@ export interface Ctx {
   // domain actions
   toggleTopic: (tid: string, cid: string, topicId: string, trainer: string, date: string) => void;
   patchCompletion: (tid: string, cid: string, topicId: string, patch: { date?: string; trainer?: string }) => void;
-  assign: (traineeId: string, courseId: string, due?: string) => boolean;
+  assign: (traineeId: string, courseId: string, due?: string, trainer?: string) => boolean;
   unassign: (assignmentId: string) => void;
   saveSession: (d: SessionDraft) => string | null;
   undoSession: (id: string) => void;
@@ -310,10 +310,10 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    const assign: Ctx['assign'] = (traineeId, courseId, due = '') => {
+    const assign: Ctx['assign'] = (traineeId, courseId, due = '', trainer = '') => {
       if (isAssigned(S0.current, traineeId, courseId)) return false;
       update((s) => {
-        s.assignments.push({ id: uid('a'), traineeId, courseId, assignedOn: today(), due });
+        s.assignments.push({ id: uid('a'), traineeId, courseId, assignedOn: today(), due, trainer });
       });
       return true;
     };

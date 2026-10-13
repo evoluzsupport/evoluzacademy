@@ -103,6 +103,7 @@ const TABLES: Table[] = [
         course_id: a.courseId,
         assigned_on: nul(a.assignedOn),
         due: nul(a.due),
+        trainer: a.trainer ?? '',
       })),
   },
   {
@@ -272,6 +273,7 @@ export async function loadRemote(): Promise<State> {
       courseId: str(a.course_id),
       assignedOn: str(a.assigned_on),
       due: str(a.due),
+      trainer: str(a.trainer),
     })
   );
 

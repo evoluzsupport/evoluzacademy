@@ -56,6 +56,8 @@ export interface Assignment {
   courseId: string;
   assignedOn: string;
   due: string;
+  /** trainer responsible for this learner on this course */
+  trainer?: string;
 }
 export interface ProgressRec {
   done: true;

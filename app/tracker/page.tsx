@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 import { assignedCourses, orderedTopics, scopeTrainees, statCourse, topicKey } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
-import { Empty, PageHead, SectionTitle } from '@/components/ui';
+import { Empty, PageHead, Pill, ProgressBar, SectionTitle } from '@/components/ui';
+import { fmtDate, isOverdue } from '@/lib/util';
 import { TopicRow } from '@/components/topic';
 
 function Tracker() {
@@ -35,7 +36,7 @@ function Tracker() {
     <>
       <PageHead
         title={isTrainee ? 'My courses' : 'Training tracker'}
-        desc={isTrainee ? 'Tick topics as you complete them. Your trainer’s report updates automatically.' : 'Individual topic status, actual trainer, and editable completion date.'}
+        desc={isTrainee ? 'Your courses, assigned trainers and progress. Your trainer updates your topics as you complete them.' : 'Individual topic status, actual trainer, and editable completion date.'}
         actions={!isTrainee && <Link className="btn primary" href="/session">＋ Log a group session</Link>}
       />
       <section className="card detail-panel" style={{ marginBottom: 16 }}>
@@ -63,12 +64,44 @@ function Tracker() {
           )}
         </div>
       </section>
+      {isTrainee && (
+        <section className="card table-card" style={{ marginBottom: 16 }}>
+          <div style={{ padding: '14px 15px 4px' }}>
+            <SectionTitle title="My course and trainer report" />
+          </div>
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>Course</th><th>Assigned trainer</th><th>Primary trainer</th><th>Assigned</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
+              <tbody>
+                {S.assignments.filter((a) => a.traineeId === t.id).map((a) => {
+                  const cc = S.courses.find((x) => x.id === a.courseId);
+                  if (!cc) return null;
+                  const st = statCourse(S, t.id, cc);
+                  const overdue = isOverdue(a.due, st.pct);
+                  return (
+                    <tr key={a.id}>
+                      <td><b>{cc.name}</b></td>
+                      <td>{a.trainer || 'No Trainer Assigned'}</td>
+                      <td>{primaryOf(cc)}</td>
+                      <td>{fmtDate(a.assignedOn)}</td>
+                      <td>{a.due ? fmtDate(a.due) : '—'}</td>
+                      <td><ProgressBar pct={st.pct} /></td>
+                      <td><Pill kind={overdue ? 'overdue' : st.pct >= 100 ? 'done' : st.pct > 0 ? 'progress' : 'wait'}>{overdue ? 'Overdue' : st.pct >= 100 ? 'Completed' : st.pct > 0 ? 'In progress' : 'Not started'}</Pill></td>
+                    </tr>
+                  );
+                })}
+                {!assigned.length && <tr><td colSpan={7}><Empty>No course assigned yet.</Empty></td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       {c ? (
         <div className="detail-layout">
           <section className="card detail-panel">
             <SectionTitle title={`${c.name} · ${topics.length} topics`} right={<span className="subtle">{done} complete · {topics.length - done} remaining</span>} />
-            {topics.map((x) => <TopicRow key={`${t.id}-${c.id}-${x.id}`} traineeId={t.id} course={c} topic={x} editable />)}
-            {isTrainee && <p className="readonly-note">Tick a topic when you complete it. Your trainer sees it in their tracker straight away.</p>}
+            {topics.map((x) => <TopicRow key={`${t.id}-${c.id}-${x.id}`} traineeId={t.id} course={c} topic={x} editable={!isTrainee} />)}
+            {isTrainee && <p className="readonly-note">View only. Your trainer marks topics as they are completed in your sessions.</p>}
           </section>
           <aside className="grid" style={{ alignContent: 'start' }}>
             <section className="card detail-panel">

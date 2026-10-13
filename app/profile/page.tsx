@@ -40,9 +40,9 @@ export default function ProfilePage() {
       <section className="card detail-panel" style={{ maxWidth: 560 }}>
         <form onSubmit={save}>
           <div className="form-grid">
-            <div className="field full"><label htmlFor="p-n">Full name</label><input id="p-n" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+            <div className="field full"><label htmlFor="p-n">Full name</label><input id="p-n" value={name} onChange={(e) => setName(e.target.value)} required disabled={me.kind === 'trainee'} /></div>
             <div className="field full"><label>Email</label><input value={me.email || '— none —'} disabled readOnly /></div>
-            <div className="field full"><label htmlFor="p-p">Phone</label><input id="p-p" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div className="field full"><label htmlFor="p-p">Phone</label><input id="p-p" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={me.kind === 'trainee'} /></div>
             {trainee && (
               <>
                 <div className="field"><label>Role</label><input value={trainee.jobRole} disabled readOnly /></div>
@@ -51,7 +51,11 @@ export default function ProfilePage() {
             )}
             {trainer && <div className="field full"><label>Role</label><input value={trainer.specialty} disabled readOnly /></div>}
           </div>
-          <div className="modal-actions"><button className="btn primary">Save changes</button></div>
+          {me.kind === 'trainee' ? (
+            <p className="subtle" style={{ marginTop: 14 }}>Your profile is managed by an admin. Ask them if something needs updating.</p>
+          ) : (
+            <div className="modal-actions"><button className="btn primary">Save changes</button></div>
+          )}
         </form>
       </section>
     </Guard>

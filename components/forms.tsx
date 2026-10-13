@@ -225,6 +225,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const [tid, setTid] = useState(traineeId ?? '');
   const [cid, setCid] = useState(courseId ?? '');
   const [due, setDue] = useState('');
+  const [trainer, setTrainer] = useState('');
   void me;
 
   const trainees = S.trainees.filter((t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))));
@@ -232,7 +233,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!assign(tid, cid, due)) return toast('This trainee already has that course');
+    if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer)) return toast('This trainee already has that course');
     closeModal();
     toast('Course assigned');
   };
@@ -252,6 +253,12 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
             <select value={cid} onChange={(e) => setCid(e.target.value)} disabled={!!courseId} required>
               <option value="">Select course…</option>
               {courses.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.topics.length} topics)</option>)}
+            </select>
+          </Field>
+          <Field label="Trainer (optional)" full>
+            <select value={trainer} onChange={(e) => setTrainer(e.target.value)}>
+              <option value="">No Trainer Assigned</option>
+              {trainerNames(S).filter((n) => n !== 'No Trainer Assigned').map((n) => <option key={n}>{n}</option>)}
             </select>
           </Field>
           <Field label="Due date (optional)" full><input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
