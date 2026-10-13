@@ -255,13 +255,13 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
               {courses.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.topics.length} topics)</option>)}
             </select>
           </Field>
-          <Field label="Trainer (optional)" full>
-            <select value={trainer} onChange={(e) => setTrainer(e.target.value)}>
-              <option value="">No Trainer Assigned</option>
-              {trainerNames(S).filter((n) => n !== 'No Trainer Assigned').map((n) => <option key={n}>{n}</option>)}
+          <Field label="Trainer" full>
+            <select value={trainer} onChange={(e) => setTrainer(e.target.value)} required>
+              <option value="">Select trainer…</option>
+              {trainerNames(S).map((n) => <option key={n}>{n}</option>)}
             </select>
           </Field>
-          <Field label="Due date (optional)" full><input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+          <Field label="Due date" full><input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
         </div>
         <FormActions onCancel={closeModal} save="Assign course" />
       </form>
