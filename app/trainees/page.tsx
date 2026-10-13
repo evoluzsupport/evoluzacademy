@@ -32,7 +32,7 @@ export default function TraineesPage() {
   return (
     <Guard kinds={['admin', 'trainer']}>
       <PageHead
-        title={isAdmin ? 'Trainees' : 'My trainees'}
+        title={isAdmin ? 'Trainees' : 'My Trainee'}
         desc="Manage learner profiles, learning paths, and individual progress."
         actions={
           <>

@@ -33,7 +33,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[] }> = {
   trainer: {
     workspace: [
       { href: '/', label: 'Overview', icon: '⌂' },
-      { href: '/trainees', label: 'My trainees', icon: '♙' },
+      { href: '/trainees', label: 'My Trainee', icon: '♙' },
       { href: '/my-courses', label: 'My Courses', icon: '▤' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
