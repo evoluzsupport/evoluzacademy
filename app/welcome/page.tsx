@@ -1,339 +1,441 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import TourSection from './Tour';
 import './landing.css';
+import './site.css';
 
-interface Step {
-  icon: string;
-  label: string;
-  say: string;
-}
-
-const STEPS: Step[] = [
-  { icon: '⌂', label: 'Overview', say: 'Start here: a live snapshot of every trainee, course and what needs attention today.' },
-  { icon: '♙', label: 'Trainees & trainers', say: "Keep one directory of trainees and trainers, with each person's role and progress." },
-  { icon: '▤', label: 'Courses', say: 'Build courses from planned days and topics. Import a whole curriculum from CSV.' },
-  { icon: '⇄', label: 'Ongoing Training Session', say: 'Assign courses to trainees with due dates. Everyone learns at their own pace.' },
-  { icon: '☑', label: 'Training tracker', say: 'Tick topics off as they happen. Progress stays individual, even when sessions move.' },
-  { icon: '＋', label: 'Log a session', say: 'Ran a class? Log it once and mark the topics for every attendee in one go.' },
-  { icon: '◔', label: 'Analytics', say: 'See completion, overdue courses and trainer delivery, and export it all to CSV.' },
-  { icon: '⚿', label: 'Users & access', say: 'Admins add people and choose their access: admin, trainer or trainee. Sign in with Zoho.' },
-];
-
-const STEP_MS = 4600;
-const CLICK_DELAY = 900;
-const REDIRECT_S = 7;
-
-function Robot({ talking }: { talking: boolean }) {
+/** Adds `.in` to an element the first time it scrolls into view. */
+function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') return setOn(true);
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setOn(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
-    <svg className={`lp-robot ${talking ? 'talking' : ''}`} viewBox="0 0 160 190" aria-hidden="true">
-      <ellipse cx="80" cy="182" rx="40" ry="6" fill="#203d70" opacity=".14" />
-      <g className="lp-bob">
-        <line x1="80" y1="14" x2="80" y2="34" stroke="#3158b6" strokeWidth="4" strokeLinecap="round" />
-        <circle className="lp-bulb" cx="80" cy="12" r="7" fill="#2e70c7" />
-        <rect x="32" y="34" width="96" height="70" rx="22" fill="#fff" stroke="#3158b6" strokeWidth="5" />
-        <rect x="44" y="48" width="72" height="42" rx="14" fill="#eaf4fc" />
-        <g className="lp-eyes">
-          <circle cx="64" cy="66" r="7" fill="#253f9b" />
-          <circle cx="96" cy="66" r="7" fill="#253f9b" />
-        </g>
-        <path className="lp-mouth" d="M68 80 Q80 90 92 80" fill="none" stroke="#253f9b" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="38" cy="70" r="6" fill="#3158b6" />
-        <circle cx="122" cy="70" r="6" fill="#3158b6" />
-        <rect x="46" y="110" width="68" height="54" rx="16" fill="#3158b6" />
-        <rect x="62" y="124" width="36" height="8" rx="4" fill="#fff" opacity=".85" />
-        <circle cx="70" cy="146" r="4" fill="#9fe0c8" />
-        <circle cx="90" cy="146" r="4" fill="#ffc46b" />
-        <rect x="26" y="114" width="16" height="40" rx="8" fill="#2e70c7" />
-        <rect className="lp-arm-r" x="118" y="114" width="16" height="40" rx="8" fill="#2e70c7" />
-      </g>
-    </svg>
-  );
-}
-
-function Bar({ w, c = '#4d79cf' }: { w: number; c?: string }) {
-  return (
-    <div className="lp-track">
-      <i style={{ width: w + '%', background: c }} />
+    <div ref={ref} className={`reveal ${on ? 'in' : ''} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
+      {children}
     </div>
   );
 }
 
-function Screen({ i }: { i: number }) {
-  switch (i) {
-    case 0:
-      return (
-        <div className="lp-screen">
-          <div className="lp-stats">
-            {[
-              ['Trainees', '24'],
-              ['Courses', '8'],
-              ['Avg. progress', '68%'],
-              ['Overdue', '3'],
-            ].map(([k, v]) => (
-              <div key={k} className="lp-stat">
-                <small>{k}</small>
-                <b>{v}</b>
-              </div>
-            ))}
-          </div>
-          <div className="lp-card">
-            <Bar w={72} />
-            <Bar w={48} c="#6fb99c" />
-            <Bar w={86} />
-          </div>
-        </div>
-      );
-    case 1:
-      return (
-        <div className="lp-screen">
-          {['Mira Shah · CRM Consultant', 'Arjun Mehta · Creator Developer', 'Sana Iyer · Project Coordinator'].map((n, k) => (
-            <div key={n} className="lp-row">
-              <span className="lp-av">{n[0]}</span>
-              <span>{n}</span>
-              <div style={{ width: 90 }}>
-                <Bar w={[75, 52, 90][k]} />
-              </div>
-            </div>
-          ))}
-        </div>
-      );
-    case 2:
-      return (
-        <div className="lp-screen lp-grid3">
-          {['Basic Zoho', 'Zoho CRM', 'Zoho Creator', 'Zoho People', 'Zoho Desk', 'Zoho Books'].map((n) => (
-            <div key={n} className="lp-card">
-              <b>{n}</b>
-              <small>30 days · 24 topics</small>
-            </div>
-          ))}
-        </div>
-      );
-    case 3:
-      return (
-        <div className="lp-screen">
-          {[
-            ['Mira Shah', 'Zoho CRM', 'Due 30 Oct'],
-            ['Arjun Mehta', 'Zoho Creator', 'Due 05 Nov'],
-            ['Sana Iyer', 'Project training', 'Due 12 Nov'],
-          ].map(([a, b, c]) => (
-            <div key={a} className="lp-row">
-              <span>{a}</span>
-              <span className="lp-pill">{b}</span>
-              <small>{c}</small>
-            </div>
-          ))}
-        </div>
-      );
-    case 4:
-      return (
-        <div className="lp-screen">
-          {['Introduction to the portal', 'Leads and contacts', 'Deals pipeline', 'Reports and dashboards'].map((t, k) => (
-            <div key={t} className="lp-row">
-              <span className={`lp-check ${k < 3 ? 'on' : ''}`}>{k < 3 ? '✓' : ''}</span>
-              <span>{t}</span>
-              <small>Day {k + 1}</small>
-            </div>
-          ))}
-        </div>
-      );
-    case 5:
-      return (
-        <div className="lp-screen">
-          <div className="lp-card">
-            <small>Course</small>
-            <b>Zoho CRM</b>
-          </div>
-          <div className="lp-row">
-            <span className="lp-pill">Mira</span>
-            <span className="lp-pill">Arjun</span>
-            <span className="lp-pill">Sana</span>
-          </div>
-          <div className="lp-btn">Save session · 9 topic marks</div>
-        </div>
-      );
-    case 6:
-      return (
-        <div className="lp-screen">
-          <div className="lp-bars">
-            {[40, 62, 55, 80, 70, 92].map((h, k) => (
-              <i key={k} style={{ height: h + '%' }} />
-            ))}
-          </div>
-        </div>
-      );
-    default:
-      return (
-        <div className="lp-screen">
-          {[
-            ['Admin', 'admin@evoluz.tech'],
-            ['Trainer', 'trainer@evoluz.tech'],
-            ['Trainee', 'trainee@evoluz.tech'],
-          ].map(([r, e]) => (
-            <div key={e} className="lp-row">
-              <span>{e}</span>
-              <span className="lp-pill">{r}</span>
-            </div>
-          ))}
-        </div>
-      );
-  }
-}
-
-export default function WelcomePage() {
-  const router = useRouter();
-  const [cursor, setCursor] = useState(0); // where the robot's cursor is
-  const [active, setActive] = useState(0); // which screen is shown
-  const [clicks, setClicks] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const explored = useRef(false); // once the user takes over, never auto-redirect
-  const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  // robot moves the cursor to a feature, then "clicks" it
-  const go = useCallback((i: number) => {
-    setCursor(i);
-    clearTimeout(pending.current);
-    pending.current = setTimeout(() => {
-      setActive(i);
-      setClicks((c) => c + 1);
-    }, CLICK_DELAY);
-  }, []);
-
-  const cursorRef = useRef(0);
-  cursorRef.current = cursor;
-
-  // autoplay through every feature once, then offer to continue to sign in
+/** Counts up to `to` once it is visible. */
+function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [n, setN] = useState(0);
   useEffect(() => {
-    if (!playing || countdown !== null) return;
-    const id = setInterval(() => {
-      const next = cursorRef.current + 1;
-      if (next >= STEPS.length) {
-        if (!explored.current) setCountdown(REDIRECT_S);
-        go(0);
-      } else go(next);
-    }, STEP_MS);
-    return () => clearInterval(id);
-  }, [playing, countdown, go]);
-
-  useEffect(() => () => clearTimeout(pending.current), []);
-
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown <= 0) {
-      router.push('/login');
+    const el = ref.current;
+    if (!el) return;
+    let raf = 0;
+    const run = () => {
+      const start = performance.now();
+      const tick = (t: number) => {
+        const p = Math.min(1, (t - start) / 1400);
+        setN(Math.round(to * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    };
+    if (typeof IntersectionObserver === 'undefined') {
+      setN(to);
       return;
     }
-    const t = setTimeout(() => setCountdown((c) => (c === null ? c : c - 1)), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, router]);
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        run();
+        io.disconnect();
+      }
+    });
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [to]);
+  return (
+    <span ref={ref}>
+      {n}
+      {suffix}
+    </span>
+  );
+}
 
-  const pick = (i: number) => {
-    explored.current = true;
-    setPlaying(false);
-    setCountdown(null);
-    go(i);
-  };
-  const stay = () => {
-    explored.current = true;
-    setCountdown(null);
-    setPlaying(true);
-  };
+const FEATURES = [
+  { icon: '▤', title: 'Course Library', text: 'Build learning paths from planned days and topics. Each topic carries what to cover and the practical activity.' },
+  { icon: '♙', title: 'Learner Tracking', text: 'Progress stays individual. See who is on track, who is overdue and what is next for every learner.' },
+  { icon: '＋', title: 'Log Sessions Once', text: 'Run a class, pick the attendees and topics, and mark everyone in one go. Undo a session any time.' },
+  { icon: '♧', title: 'Assign Trainers', text: 'Set the trainer responsible for each learner on each course, with a clear report for both sides.' },
+  { icon: '◔', title: 'Analytics And Reports', text: 'Completion, overdue courses and trainer delivery at a glance, with CSV export for any list.' },
+  { icon: '⚿', title: 'Roles And Access', text: 'Admin, trainer or trainee. Admins change access in one click and everyone sees only what they should.' },
+  { icon: '⇪', title: 'Import In Minutes', text: 'Bring your whole curriculum, users and trainees from a spreadsheet-style CSV with a ready sample file.' },
+  { icon: '✓', title: 'Sign In With Zoho', text: 'One secure sign-in with the Zoho account your team already uses. New people start as trainees.' },
+];
+
+const HOW = [
+  { n: '01', title: 'Add Your People', text: 'Import users or add them one by one, then choose who is an admin, trainer or trainee.' },
+  { n: '02', title: 'Load The Courses', text: 'Import the training manual. Every course, day, topic and activity is ready to use.' },
+  { n: '03', title: 'Assign And Teach', text: 'Assign courses and a trainer to each learner, then log sessions as training happens.' },
+  { n: '04', title: 'Track And Report', text: 'Watch progress update live and export reports for managers, trainers and learners.' },
+];
+
+const ROLES = [
+  {
+    name: 'Admin',
+    tone: 'blue',
+    line: 'Runs the academy',
+    points: ['Add, edit and import users', 'Change anyone\'s access', 'Manage courses and topics', 'Assign courses and trainers', 'Full analytics and exports'],
+  },
+  {
+    name: 'Trainer',
+    tone: 'green',
+    line: 'Teaches and tracks',
+    points: ['See only assigned courses', 'Log sessions for attendees', 'Mark topics as covered', 'Follow their own learners', 'Take courses as a learner too'],
+  },
+  {
+    name: 'Trainee',
+    tone: 'amber',
+    line: 'Learns with clarity',
+    points: ['See assigned courses and trainers', 'Follow a clear learning plan', 'View progress and due dates', 'Read what each topic covers', 'View-only, so records stay trusted'],
+  },
+];
+
+const COURSES = [
+  'Basic Zoho', 'Zoho CRM', 'Zoho Creator', 'Zoho People', 'Zoho Desk', 'Zoho Books', 'Zoho Projects', 'Zoho Recruit',
+  'Zoho Analytics', 'Zoho Marketing Automation', 'Zoho Campaigns', 'Zoho Inventory', 'Zoho SalesIQ', 'Zoho Billing',
+  'Zoho POS', 'Zoho FSM', 'Zoho Thrive', 'Zoho Vault', 'Zoho Qengine', 'Zoho Directory', 'Zoho OneAuth', 'Zoho eProtect',
+  'Zoho Command Center', 'Zoho RPA', 'PC Training',
+];
+
+const FAQ = [
+  { q: 'Who can sign in?', a: 'Anyone with a Zoho account. People already added by an admin keep the access they were given. A brand new email starts as a trainee, and an admin can change it later.' },
+  { q: 'Can trainees change their own progress?', a: 'No. Trainees can view their courses, trainers and progress, but only trainers and admins record completion, which keeps the records trusted.' },
+  { q: 'What does a trainer see?', a: 'Only the courses an admin assigned to them, and the learners on those courses. Trainers can also be assigned courses to learn, with their own report.' },
+  { q: 'How do we load our courses?', a: 'Use Import Curriculum with the sample file. It uses the same columns as the training manual: day, trainer, category, topic, what we cover and the activity.' },
+  { q: 'Is the data shared between people?', a: 'Yes. Everything is stored centrally, so a trainer\'s update shows for the trainee and the admin straight away.' },
+  { q: 'Can I export reports?', a: 'Yes. Courses, users, trainers and assignments can be exported to CSV from their pages.' },
+];
+
+const BENEFITS = [
+  { icon: '⏱', title: 'Save Hours Every Week', text: 'Log a whole class in one step instead of updating every learner by hand.' },
+  { icon: '◎', title: 'Always Know Where Everyone Stands', text: 'Live completion, overdue alerts and next topics for every learner.' },
+  { icon: '☁', title: 'One Shared Source Of Truth', text: 'Admins, trainers and trainees all see the same up-to-date records.' },
+  { icon: '⚑', title: 'Consistent Quality', text: 'Every trainer follows the same topics and activities, batch after batch.' },
+  { icon: '⇩', title: 'Reports On Demand', text: 'Export courses, users, trainers and assignments to CSV in a click.' },
+  { icon: '☺', title: 'Easy For Everyone', text: 'A clean, simple interface that new trainers and trainees pick up in minutes.' },
+];
+
+const SHOWCASE = [
+  { label: 'Zoho CRM', value: 88, tone: 'blue' },
+  { label: 'Zoho Creator', value: 72, tone: 'green' },
+  { label: 'Zoho Books', value: 64, tone: 'amber' },
+  { label: 'Zoho Desk', value: 91, tone: 'purple' },
+];
+
+const TESTIMONIALS = [
+  { q: 'We stopped chasing spreadsheets. Every trainer logs a session and the progress is just there.', n: 'Training Lead', r: 'Operations' },
+  { q: 'New joiners know exactly what to learn and who is teaching them. Onboarding feels organised.', n: 'Team Manager', r: 'Delivery' },
+  { q: 'Seeing overdue courses at a glance changed how we plan our week.', n: 'Senior Trainer', r: 'Zoho Practice' },
+];
+
+const WORDS = ['Learner', 'Trainer', 'Course', 'Session'];
+
+const NAV = [
+  ['Features', '#features'],
+  ['How It Works', '#how'],
+  ['Roles', '#roles'],
+  ['Courses', '#courses'],
+  ['FAQ', '#faq'],
+];
+
+export default function WelcomePage() {
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState<number | null>(0);
+  const [progress, setProgress] = useState(0);
+  const [wordIx, setWordIx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setWordIx((i) => (i + 1) % WORDS.length), 2200);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const on = () => {
+      setScrolled(window.scrollY > 12);
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(h > 0 ? Math.min(100, (window.scrollY / h) * 100) : 0);
+    };
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
 
   return (
-    <div className="lp">
-      <header className="lp-top">
-        <Image src="/evoluz-logo.png" alt="Evoluz" width={150} height={40} priority style={{ width: 150, height: 'auto' }} />
-        <Link href="/login" className="btn primary">
-          Sign in
-        </Link>
+    <div className="site">
+      <div className="scroll-bar" style={{ width: `${progress}%` }} />
+      <header className={`site-head ${scrolled ? 'scrolled' : ''}`}>
+        <div className="site-head-in">
+          <a href="#top" className="site-logo">
+            <Image src="/evoluz-logo.png" alt="Evoluz" width={150} height={40} priority style={{ width: 150, height: 'auto' }} />
+          </a>
+          <nav className="site-nav" aria-label="Sections">
+            {NAV.map(([label, href]) => (
+              <a key={href} href={href}>{label}</a>
+            ))}
+          </nav>
+          <Link href="/login" className="btn primary">Sign In</Link>
+        </div>
       </header>
 
-      <section className="lp-hero">
-        <p className="lp-eyebrow">Evoluz Academy</p>
-        <h1>Every learner. Every topic. One clear picture.</h1>
-        <p>Plan courses, log sessions and track each trainee&apos;s progress. Let our guide show you around.</p>
+      <section id="top" className="hero">
+        <div className="hero-bg" aria-hidden="true">
+          <span /><span /><span /><span />
+        </div>
+        <div className="hero-copy">
+          <p className="hero-pill"><i /> Evoluz Academy · Training Management</p>
+          <h1>
+            Every <span className="word" key={wordIx}>{WORDS[wordIx]}</span>. Every Topic.
+            <br />
+            <em>One Clear Picture.</em>
+          </h1>
+          <p className="hero-sub">
+            Plan courses, assign trainers, log sessions and watch each person&apos;s progress grow. One calm place for admins, trainers and trainees.
+          </p>
+          <div className="hero-cta">
+            <Link href="/login" className="btn primary big">Sign In With Zoho</Link>
+            <a href="#tour" className="btn big">Watch The Tour</a>
+          </div>
+          <div className="hero-trust">
+            <div className="avatars"><i>A</i><i>T</i><i>L</i><i>+</i></div>
+            <span>Trusted by admins, trainers and trainees across the Evoluz team</span>
+          </div>
+          <ul className="hero-points">
+            <li>✓ Zoho single sign-in</li>
+            <li>✓ Role based views</li>
+            <li>✓ Live progress</li>
+          </ul>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          <div className="float-card f1"><small>Course Progress</small><b>82%</b><div className="mini-bar"><i style={{ width: '82%' }} /></div></div>
+          <div className="float-card f2"><span className="dot ok">✓</span><div><b>Session Logged</b><small>Zoho CRM · 6 attendees</small></div></div>
+          <div className="float-card f3"><span className="dot">♧</span><div><b>Trainer Assigned</b><small>Shivangi Kumari</small></div></div>
+          <div className="float-card f4"><small>Topics Completed</small><b>24 / 37</b></div>
+          <div className="hero-orb"><span>⌂</span></div>
+          <div className="ring r1" /><div className="ring r2" />
+          <div className="float-card f5"><span className="dot">★</span><div><b>25+ Courses</b><small>Ready to teach</small></div></div>
+        </div>
       </section>
 
-      <section className="lp-stage" aria-label="App tour">
-        <div className="lp-guide">
-          <div className="lp-bubble" key={active}>
-            <small>
-              {active + 1} / {STEPS.length} · {STEPS[active].label}
-            </small>
-            <p>{STEPS[active].say}</p>
-          </div>
-          <Robot talking={cursor === active} />
-        </div>
-
-        <div className="lp-window" role="img" aria-label={`Preview of ${STEPS[active].label}`}>
-          <div className="lp-chrome">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className="lp-app">
-            <nav className="lp-nav">
-              {STEPS.map((s, i) => (
-                <button key={s.label} className={i === active ? 'on' : ''} onClick={() => pick(i)}>
-                  <span>{s.icon}</span>
-                  {s.label}
-                </button>
-              ))}
-              <div className="lp-cursor" style={{ transform: `translate(118px, ${14 + cursor * 40}px)` }}>
-                <svg viewBox="0 0 24 24" width="26" height="26">
-                  <path d="M4 2l16 9-7 2-3 7z" fill="#18243b" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
-                </svg>
-                <span key={clicks} className="lp-ripple" />
-              </div>
-            </nav>
-            <div className="lp-panel" key={active}>
-              <h3>{STEPS[active].label}</h3>
-              <Screen i={active} />
+      <section className="stats-band">
+        <Reveal className="stats-in">
+          {[
+            ['Courses', 25, '+'],
+            ['Topics', 550, '+'],
+            ['Roles', 3, ''],
+            ['Sign In', 1, ' Click'],
+          ].map(([k, v, s]) => (
+            <div key={String(k)} className="stat-big">
+              <b><Counter to={Number(v)} suffix={String(s)} /></b>
+              <span>{k}</span>
             </div>
-          </div>
-        </div>
+          ))}
+        </Reveal>
       </section>
 
-      <section className="lp-controls">
-        <div className="lp-dots">
-          {STEPS.map((s, i) => (
-            <button key={s.label} aria-label={s.label} className={i === active ? 'on' : ''} onClick={() => pick(i)} />
+      <section id="features" className="block">
+        <Reveal>
+          <p className="kicker">Features</p>
+          <h2 className="block-title">Everything A Training Team Needs</h2>
+          <p className="block-sub">From the first onboarding day to the last assessment, every step has a home.</p>
+        </Reveal>
+        <div className="feature-grid">
+          {FEATURES.map((f, i) => (
+            <Reveal key={f.title} delay={(i % 4) * 90} className="feature">
+              <span className="feature-ico">{f.icon}</span>
+              <h3>{f.title}</h3>
+              <p>{f.text}</p>
+            </Reveal>
           ))}
         </div>
-        <button
-          className="btn"
-          onClick={() => {
-            explored.current = true;
-            setCountdown(null);
-            setPlaying((p) => !p);
-          }}
-        >
-          {playing ? '❚❚ Pause tour' : '▶ Play tour'}
-        </button>
       </section>
 
-      <section className="lp-cta">
-        {countdown !== null ? (
-          <div className="lp-redirect" role="status">
-            <span>
-              Taking you to sign in in <b>{countdown}s</b>
-            </span>
-            <button className="btn" onClick={stay}>
-              Stay here
-            </button>
-            <Link href="/login" className="btn primary">
-              Sign in now
-            </Link>
+      <section className="block showcase">
+        <Reveal className="show-copy">
+          <p className="kicker left">Live Progress</p>
+          <h2 className="block-title left">Watch Learning Grow In Real Time</h2>
+          <p className="block-sub left">Every logged session updates the numbers instantly, so managers, trainers and learners always see the same picture.</p>
+          <ul className="tick-list">
+            <li>Course completion per learner</li>
+            <li>Overdue topics highlighted early</li>
+            <li>Trainer delivery at a glance</li>
+          </ul>
+          <Link href="/login" className="btn primary big">Get Started</Link>
+        </Reveal>
+        <Reveal delay={150} className="show-panel">
+          <div className="panel-head"><b>Course Completion</b><span className="live"><i /> Live</span></div>
+          {SHOWCASE.map((s) => (
+            <div key={s.label} className="bar-row">
+              <span>{s.label}</span>
+              <div className={`bar bar-${s.tone}`}><i style={{ ['--w' as string]: `${s.value}%` }} /></div>
+              <b>{s.value}%</b>
+            </div>
+          ))}
+          <div className="panel-foot">
+            <div><b>128</b><small>Sessions Logged</small></div>
+            <div><b>46</b><small>Active Learners</small></div>
+            <div><b>12</b><small>Trainers</small></div>
           </div>
-        ) : (
-          <Link href="/login" className="btn primary lp-big">
-            Sign in to Evoluz Academy
-          </Link>
-        )}
+        </Reveal>
       </section>
+
+      <section className="block">
+        <Reveal>
+          <p className="kicker">Why Evoluz Academy</p>
+          <h2 className="block-title">Built To Make Training Easier</h2>
+          <p className="block-sub">Less admin, more teaching. Here is what teams gain from day one.</p>
+        </Reveal>
+        <div className="benefit-grid">
+          {BENEFITS.map((b, i) => (
+            <Reveal key={b.title} delay={(i % 3) * 100} className="benefit">
+              <span className="benefit-ico">{b.icon}</span>
+              <div><h3>{b.title}</h3><p>{b.text}</p></div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="tour" className="block tinted">
+        <Reveal>
+          <p className="kicker">Take A Tour</p>
+          <h2 className="block-title">See It In Action</h2>
+          <p className="block-sub">Our guide walks through each part of the academy. Click any item to jump straight to it.</p>
+        </Reveal>
+        <Reveal delay={120}>
+          <TourSection />
+        </Reveal>
+      </section>
+
+      <section id="how" className="block">
+        <Reveal>
+          <p className="kicker">How It Works</p>
+          <h2 className="block-title">Up And Running In Four Steps</h2>
+        </Reveal>
+        <div className="steps">
+          {HOW.map((h, i) => (
+            <Reveal key={h.n} delay={i * 120} className="step">
+              <span className="step-n">{h.n}</span>
+              <h3>{h.title}</h3>
+              <p>{h.text}</p>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="roles" className="block tinted">
+        <Reveal>
+          <p className="kicker">Roles</p>
+          <h2 className="block-title">The Right View For Everyone</h2>
+          <p className="block-sub">Each person sees what they need and nothing they don&apos;t.</p>
+        </Reveal>
+        <div className="role-grid">
+          {ROLES.map((r, i) => (
+            <Reveal key={r.name} delay={i * 120} className={`role role-${r.tone}`}>
+              <div className="role-top">
+                <span className="role-badge">{r.name}</span>
+                <small>{r.line}</small>
+              </div>
+              <ul>
+                {r.points.map((p) => <li key={p}>{p}</li>)}
+              </ul>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="courses" className="block">
+        <Reveal>
+          <p className="kicker">Course Library</p>
+          <h2 className="block-title">A Full Zoho Curriculum, Ready To Teach</h2>
+          <p className="block-sub">From the common onboarding path to role-based practice across the Zoho suite.</p>
+        </Reveal>
+        <div className="marquee" aria-hidden="true">
+          <div className="marquee-track">
+            {[...COURSES, ...COURSES].map((c, i) => <span key={i} className="chip">{c}</span>)}
+          </div>
+        </div>
+        <div className="marquee rev" aria-hidden="true">
+          <div className="marquee-track">
+            {[...COURSES].reverse().concat([...COURSES].reverse()).map((c, i) => <span key={i} className="chip alt">{c}</span>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="block">
+        <Reveal>
+          <p className="kicker">Voices</p>
+          <h2 className="block-title">What Teams Say</h2>
+        </Reveal>
+        <div className="quote-grid">
+          {TESTIMONIALS.map((t, i) => (
+            <Reveal key={t.n} delay={i * 120} className="quote">
+              <span className="quote-mark">“</span>
+              <p>{t.q}</p>
+              <div className="quote-by"><i>{t.n[0]}</i><div><b>{t.n}</b><small>{t.r}</small></div></div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="faq" className="block tinted">
+        <Reveal>
+          <p className="kicker">FAQ</p>
+          <h2 className="block-title">Questions, Answered</h2>
+        </Reveal>
+        <div className="faq">
+          {FAQ.map((f, i) => (
+            <Reveal key={f.q} delay={i * 60}>
+              <div className={`faq-item ${open === i ? 'open' : ''}`}>
+                <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+                  <span>{f.q}</span>
+                  <i>{open === i ? '−' : '+'}</i>
+                </button>
+                <div className="faq-body"><p>{f.a}</p></div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section className="cta-band">
+        <Reveal className="cta-in">
+          <h2>Ready To Bring Your Training Together?</h2>
+          <p>Sign in with Zoho and see every learner, course and session in one place.</p>
+          <Link href="/login" className="btn big cta-btn">Sign In To Evoluz Academy</Link>
+        </Reveal>
+      </section>
+
+      <footer className="site-foot">
+        <div className="site-foot-in">
+          <Image src="/evoluz-logo.png" alt="Evoluz" width={120} height={32} style={{ width: 120, height: 'auto' }} />
+          <nav aria-label="Footer">
+            {NAV.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
+            <Link href="/login">Sign In</Link>
+          </nav>
+          <small>© {new Date().getFullYear()} Evoluz Academy · Think · Innovate · Grow</small>
+        </div>
+      </footer>
     </div>
   );
 }
