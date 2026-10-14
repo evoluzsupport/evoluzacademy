@@ -224,6 +224,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const { S, assign, closeModal, toast, me } = usePortal();
   const [tid, setTid] = useState(traineeId ?? '');
   const [cid, setCid] = useState(courseId ?? '');
+  const [start, setStart] = useState('');
   const [due, setDue] = useState('');
   const [trainer, setTrainer] = useState('');
   void me;
@@ -239,7 +240,8 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer)) return toast('This trainee already has that course');
+    if (start && due && due < start) return toast('Due date cannot be before the start date');
+    if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer, start)) return toast('This trainee already has that course');
     closeModal();
     toast('Course assigned');
   };
@@ -267,7 +269,8 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
               {trainerNames(S).map((n) => <option key={n}>{n}</option>)}
             </select>
           </Field>
-          <Field label="Due date" full><input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+          <Field label="Start date"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
+          <Field label="Due date"><input type="date" value={due} min={start || undefined} onChange={(e) => setDue(e.target.value)} /></Field>
         </div>
         <FormActions onCancel={closeModal} save="Assign course" />
       </form>

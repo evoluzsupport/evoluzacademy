@@ -55,6 +55,8 @@ export interface Assignment {
   traineeId: string;
   courseId: string;
   assignedOn: string;
+  /** when the learner is due to start the course */
+  startDate?: string;
   due: string;
   /** trainer responsible for this learner on this course */
   trainer?: string;

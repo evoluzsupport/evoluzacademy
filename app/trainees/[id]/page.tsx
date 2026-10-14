@@ -97,6 +97,7 @@ export default function TraineeDetail() {
                 sub={
                   <>
                     {x.done} of {x.total} topics complete · {x.pct}% · Primary trainer: {primaryOf(c)}
+                    {a.startDate && <> · <Pill kind="neutral">Starts {fmtDate(a.startDate)}</Pill></>}
                     {a.due && <> · <Pill kind={overdue ? 'overdue' : 'neutral'}>{overdue ? 'Overdue · ' : 'Due '}{fmtDate(a.due)}</Pill></>}
                   </>
                 }

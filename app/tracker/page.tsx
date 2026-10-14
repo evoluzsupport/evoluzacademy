@@ -71,7 +71,7 @@ function Tracker() {
           </div>
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Course</th><th>Assigned trainer</th><th>Primary trainer</th><th>Assigned</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
+              <thead><tr><th>Course</th><th>Assigned trainer</th><th>Primary trainer</th><th>Assigned</th><th>Start date</th><th>Due</th><th>Progress</th><th>Status</th></tr></thead>
               <tbody>
                 {S.assignments.filter((a) => a.traineeId === t.id).map((a) => {
                   const cc = S.courses.find((x) => x.id === a.courseId);
@@ -87,6 +87,7 @@ function Tracker() {
                       <td><b>{assignedTrainer}</b></td>
                       <td>{primaryOf(cc)}</td>
                       <td>{fmtDate(a.assignedOn)}</td>
+<td>{a.startDate ? fmtDate(a.startDate) : '—'}</td>
                       <td>{a.due ? fmtDate(a.due) : '—'}</td>
                       <td><ProgressBar pct={st.pct} /></td>
                       <td><Pill kind={overdue ? 'overdue' : st.pct >= 100 ? 'done' : st.pct > 0 ? 'progress' : 'wait'}>{overdue ? 'Overdue' : st.pct >= 100 ? 'Completed' : st.pct > 0 ? 'In progress' : 'Not started'}</Pill></td>

@@ -31,6 +31,12 @@ export default function AssignmentsPage() {
     toast(trainer ? `Trainer assigned: ${trainer}` : 'Trainer cleared');
   };
 
+  const setStart = (id: string, startDate: string) =>
+    update((s) => {
+      const a = s.assignments.find((x) => x.id === id);
+      if (a) a.startDate = startDate;
+    });
+
   const setDue = (id: string, due: string) =>
     update((s) => {
       const a = s.assignments.find((x) => x.id === id);
@@ -48,7 +54,7 @@ export default function AssignmentsPage() {
               className="btn"
               onClick={() => {
                 downloadCSV(
-                  [['Trainee', 'Course', 'Trainer', 'Assigned', 'Due', 'Progress %'], ...rows.map((x) => [x.t!.name, x.c!.name, x.a.trainer || 'No Trainer Assigned', x.a.assignedOn, x.a.due, statCourse(S, x.t!.id, x.c!).pct])],
+                  [['Trainee', 'Course', 'Trainer', 'Assigned', 'Start date', 'Due', 'Progress %'], ...rows.map((x) => [x.t!.name, x.c!.name, x.a.trainer || 'No Trainer Assigned', x.a.assignedOn, x.a.startDate ?? '', x.a.due, statCourse(S, x.t!.id, x.c!).pct])],
                   'evoluz-assignments.csv'
                 );
                 toast('CSV exported');
@@ -66,7 +72,7 @@ export default function AssignmentsPage() {
         </div>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Trainee</th><th>Course</th><th>Trainer</th><th>Assigned</th><th>Due date</th><th>Progress</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Trainee</th><th>Course</th><th>Trainer</th><th>Assigned</th><th>Start date</th><th>Due date</th><th>Progress</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {rows.map(({ a, t, c }) => {
                 const st = statCourse(S, t!.id, c!);
@@ -89,6 +95,9 @@ export default function AssignmentsPage() {
                     </td>
                     <td>{fmtDate(a.assignedOn)}</td>
                     <td>
+                      <input className="input" type="date" aria-label={`Start date for ${t!.name}, ${c!.name}`} style={{ padding: '5px 7px', fontSize: 11 }} value={a.startDate ?? ''} onChange={(e) => setStart(a.id, e.target.value)} />
+                    </td>
+                    <td>
                       <input className="input" type="date" aria-label={`Due date for ${t!.name}, ${c!.name}`} style={{ padding: '5px 7px', fontSize: 11 }} value={a.due} onChange={(e) => setDue(a.id, e.target.value)} />
                     </td>
                     <td><ProgressBar pct={st.pct} /></td>
@@ -97,7 +106,7 @@ export default function AssignmentsPage() {
                   </tr>
                 );
               })}
-              {!rows.length && <tr><td colSpan={8}><Empty>No assignments yet.</Empty></td></tr>}
+              {!rows.length && <tr><td colSpan={9}><Empty>No assignments yet.</Empty></td></tr>}
             </tbody>
           </table>
         </div>
