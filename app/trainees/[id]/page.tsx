@@ -96,7 +96,7 @@ export default function TraineeDetail() {
         </div>
         <div className="actions">
           <button className="btn" onClick={exportProgress}>Export progress</button>
-          {isAdmin && isRecord && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit profile</button>}
+          {isAdmin && isRecord && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
           {isAdmin && isRecord && (
             <button
               className="btn"

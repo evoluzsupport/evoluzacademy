@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { usePortal } from '@/lib/store';
-import { attentionItems, scopeTrainees, visibleCourses } from '@/lib/selectors';
+import { notificationsFor, scopeTrainees, visibleCourses } from '@/lib/selectors';
 import type { Kind } from '@/lib/types';
 import { initials } from '@/lib/util';
 
@@ -57,48 +57,86 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
 const ROLE_LABEL: Record<Kind, string> = { admin: 'Training coordinator', trainer: 'Trainer', trainee: 'Trainee' };
 const TONES = ['', 'coral', 'mint', 'lilac'];
 
+const NOTICE_ICON: Record<string, string> = { assigned: '▤', teach: '♧', learn: '▤', overdue: '!', hold: '❚❚', nocourse: '＋' };
+const NOTICE_LABEL: Record<string, string> = { assigned: 'New course', teach: 'Teaching', learn: 'Learning', overdue: 'Overdue', hold: 'On hold', nocourse: 'No course' };
+
+const ago = (d?: string) => {
+  if (!d) return '';
+  const n = Math.floor((Date.now() - new Date(d + 'T00:00').getTime()) / 86400000);
+  return n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : `${n} days ago`;
+};
+
 function Bell() {
-  const { S, me, openModal, closeModal } = usePortal();
+  const { S, me } = usePortal();
   const router = useRouter();
-  const items = attentionItems(S, scopeTrainees(S, me));
-  const open = () =>
-    openModal(
-      <>
-        <h2>Needs attention</h2>
-        <p>Overdue courses, trainees on hold, and active trainees with no course.</p>
-        <div className="attn">
-          {items.length ? (
-            items.map((x, i) => (
-              <button
-                key={i}
-                className="attn-item"
-                onClick={() => {
-                  closeModal();
-                  if (me?.kind !== 'trainee') router.push(`/trainees/${x.traineeId}`);
-                }}
-              >
-                <span className={`pill ${x.kind === 'overdue' ? 'overdue' : x.kind === 'hold' ? 'wait' : 'neutral'}`}>
-                  {x.kind === 'overdue' ? 'Overdue' : x.kind === 'hold' ? 'On hold' : 'No course'}
-                </span>
-                <span>
-                  <b style={{ fontSize: 12 }}>{x.text}</b>
-                  <small className="subtle" style={{ display: 'block' }}>{x.sub}</small>
-                </span>
-              </button>
-            ))
-          ) : (
-            <div className="empty">Nothing needs attention right now.</div>
-          )}
-        </div>
-        <div className="modal-actions">
-          <button className="btn" onClick={closeModal}>Close</button>
-        </div>
-      </>
-    );
+  const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState<string[]>([]);
+  const box = useRef<HTMLDivElement>(null);
+  const key = `evoluzSeen:${me?.id ?? ''}`;
+  const items = notificationsFor(S, me);
+  const unread = items.filter((x) => !seen.includes(x.id));
+
+  useEffect(() => {
+    try {
+      setSeen(JSON.parse(localStorage.getItem(key) || '[]'));
+    } catch {}
+  }, [key]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+
+  const mark = (ids: string[]) => {
+    const next = [...new Set([...seen, ...ids])].slice(-300);
+    setSeen(next);
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch {}
+  };
+  const go = (id: string, href: string) => {
+    mark([id]);
+    setOpen(false);
+    router.push(href);
+  };
+
   return (
-    <button className="bell" title="Notifications" aria-label={`Notifications (${items.length})`} onClick={open}>
-      ♧{items.length > 0 && <span className="badge">{items.length}</span>}
-    </button>
+    <div className="nbox" ref={box}>
+      <button className="bell" title="Notifications" aria-label={`Notifications (${unread.length} unread)`} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        ♧{unread.length > 0 && <span className="badge">{unread.length > 9 ? '9+' : unread.length}</span>}
+      </button>
+      {open && (
+        <div className="npanel" role="dialog" aria-label="Notifications">
+          <div className="nhead">
+            <div>
+              <b>Notifications</b>
+              <small>{unread.length ? `${unread.length} new` : 'You are all caught up'}</small>
+            </div>
+            {unread.length > 0 && <button className="nlink" onClick={() => mark(items.map((x) => x.id))}>Mark all read</button>}
+          </div>
+          <div className="nlist">
+            {items.map((x) => (
+              <button key={x.id} className={`nitem ${seen.includes(x.id) ? '' : 'new'}`} onClick={() => go(x.id, x.href)}>
+                <span className={`nico n-${x.kind}`}>{NOTICE_ICON[x.kind]}</span>
+                <span className="ntext">
+                  <b>{x.title}</b>
+                  <small>{x.sub}</small>
+                  <em>{NOTICE_LABEL[x.kind]}{x.date ? ` · ${ago(x.date)}` : ''}</em>
+                </span>
+                <span className="narrow">›</span>
+              </button>
+            ))}
+            {!items.length && <div className="empty">Nothing new right now.</div>}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

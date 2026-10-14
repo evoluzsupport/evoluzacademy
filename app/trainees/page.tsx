@@ -111,7 +111,12 @@ export default function TraineesPage() {
                   <td><ProgressBar pct={progressFor(S, t).pct} /></td>
                   <td>{t.trainer || '—'}</td>
                   <td><Pill kind={t.status === 'Active' ? 'active' : 'wait'}>{t.status}</Pill></td>
-                  <td><Link className="btn soft" href={`/trainees/${t.id}`}>View →</Link></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <Link className="btn soft" href={`/trainees/${t.id}`}>View →</Link>
+                      {isAdmin && S.trainees.some((x) => x.id === t.id) && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!list.length && <tr><td colSpan={isAdmin ? 8 : 7}><Empty>No trainees match this search.</Empty></td></tr>}

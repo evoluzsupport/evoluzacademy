@@ -219,3 +219,73 @@ export function learnersOfTrainer(S: State, name: string, pool: Trainee[]): Trai
   }
   return out;
 }
+
+export interface Notice {
+  id: string;
+  kind: 'assigned' | 'teach' | 'learn' | 'overdue' | 'hold' | 'nocourse';
+  title: string;
+  sub: string;
+  href: string;
+  /** yyyy-mm-dd the event happened, when known */
+  date?: string;
+}
+
+const RECENT_DAYS = 30;
+const daysAgo = (d?: string) => (d ? Math.floor((Date.now() - new Date(d + 'T00:00').getTime()) / 86400000) : 9999);
+
+/** What to tell the signed-in person: new course assignments for their role, plus items needing attention. */
+export function notificationsFor(S: State, me: Me | null): Notice[] {
+  if (!me) return [];
+  const out: Notice[] = [];
+  const myName = S.trainers.find((t) => t.id === me.id)?.name ?? S.admins.find((a) => a.id === me.id)?.name ?? me.name;
+  const startNote = (a: Assignment) => (a.startDate ? `Starts ${a.startDate}` : 'No start date yet');
+  const everyone = learners(S);
+
+  for (const a of S.assignments) {
+    const c = courseById(S, a.courseId);
+    if (!c || daysAgo(a.assignedOn) > RECENT_DAYS) continue;
+    const learner = everyone.find((t) => t.id === a.traineeId);
+    if (!learner) continue;
+    const trainerName = a.trainer || primaryOf(c);
+    if (a.traineeId === me.id) {
+      out.push({
+        id: 'as:' + a.id,
+        kind: 'assigned',
+        title: `New course assigned: ${c.name}`,
+        sub: `Trainer ${trainerName || 'not set'} · ${startNote(a)}`,
+        href: me.kind === 'trainee' ? `/tracker?course=${c.id}` : '/assigned-courses',
+        date: a.assignedOn,
+      });
+    } else if (me.kind === 'trainer' && nameMatches(a.trainer, myName)) {
+      out.push({
+        id: 'tr:' + a.id,
+        kind: 'teach',
+        title: `You are the trainer for ${c.name}`,
+        sub: `${learner.name} · ${startNote(a)}`,
+        href: `/courses/${c.id}`,
+        date: a.assignedOn,
+      });
+    } else if (me.kind === 'admin') {
+      out.push({
+        id: 'ad:' + a.id,
+        kind: 'assigned',
+        title: `${learner.name} was assigned ${c.name}`,
+        sub: `Trainer ${trainerName || 'not set'} · ${startNote(a)}`,
+        href: `/trainees/${learner.id}`,
+        date: a.assignedOn,
+      });
+    }
+  }
+
+  for (const x of attentionItems(S, scopeTrainees(S, me))) {
+    out.push({
+      id: `at:${x.kind}:${x.traineeId}:${x.sub}`,
+      kind: x.kind,
+      title: x.text,
+      sub: x.sub,
+      href: me.kind === 'trainee' ? '/tracker' : `/trainees/${x.traineeId}`,
+    });
+  }
+
+  return out.sort((x, y) => (y.date ?? '').localeCompare(x.date ?? ''));
+}

@@ -76,3 +76,32 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .collapse-btn .chev{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#eef4ff;color:#3158b6;font-size:12px;transition:transform .2s}
 .collapse-btn.open .chev{transform:rotate(90deg)}
 .collapse-btn:hover .chev{background:#3158b6;color:#fff}
+
+/* centered brand */
+.sidebar .brand{display:flex;flex-direction:column;align-items:center;text-align:center;padding:1px 10px 26px}
+.sidebar .brand img{margin:0 auto}
+.sidebar .brand small{text-align:center}
+/* notifications */
+.nbox{position:relative}
+.npanel{position:absolute;right:-8px;top:calc(100% + 12px);width:min(400px,92vw);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px #203d7030;z-index:30;overflow:hidden;animation:up .18s ease}
+.nhead{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;background:linear-gradient(120deg,#253f9b,#3158b6 60%,#2e70c7);color:#fff}
+.nhead b{display:block;font:800 15px Manrope;text-transform:none}
+.nhead small{color:#d6e3ff;font-size:11px}
+.nlink{border:0;background:#ffffff26;color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700}
+.nlink:hover{background:#ffffff40}
+.nlist{max-height:430px;overflow:auto;padding:8px;display:grid;gap:6px}
+.nitem{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid #edf0f5;border-radius:12px;background:#fff;padding:11px 12px;transition:.15s}
+.nitem:hover{border-color:#c9d8f1;background:#f8fbff;transform:translateX(2px)}
+.nitem.new{background:#f4f8ff;border-color:#dbe6fa}
+.nitem.new .ntext b:before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#3158b6;margin-right:7px}
+.nico{flex:none;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:15px;background:#eaf1ff;color:#3158b6}
+.nico.n-teach{background:#e3f5ec;color:#168767}
+.nico.n-overdue{background:#fde8ec;color:#c45562}
+.nico.n-hold{background:#fff1da;color:#b9741c}
+.nico.n-nocourse{background:#f1f3f6;color:#7e8999}
+.ntext{min-width:0;flex:1;display:grid;gap:2px}
+.ntext b{font-size:12px;color:#26344b;text-transform:none}
+.ntext small{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ntext em{font-style:normal;font-size:10px;color:#9aa6bb;font-weight:600}
+.narrow{color:#b3bed2;font-size:20px}
+.nitem:hover .narrow{color:#3158b6}
