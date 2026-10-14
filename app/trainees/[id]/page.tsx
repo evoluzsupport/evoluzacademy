@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
-import { assignmentsOf, learners, nameMatches, orderedTopics, progressFor, scopeTrainees, statCourse, topicKey } from '@/lib/selectors';
+import { assignmentsOf, learners, nameMatches, orderedTopics, progressFor, scopeTrainees, statCourse } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { fmtDate, isOverdue } from '@/lib/util';
@@ -15,6 +16,23 @@ export default function TraineeDetail() {
   const { id } = useParams<{ id: string }>();
   const { S, me, openModal, confirm, removeTrainee, unassign } = usePortal();
   const router = useRouter();
+  // course panels the user has collapsed
+  const [shut, setShut] = useState<Set<string>>(new Set());
+  const flip = (key: string) =>
+    setShut((p) => {
+      const n = new Set(p);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  const jump = (key: string) => {
+    setShut((p) => {
+      const n = new Set(p);
+      n.delete(key);
+      return n;
+    });
+    setTimeout(() => document.getElementById('course-' + key)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
   const t = learners(S).find((x) => x.id === id);
   // trainers and admins taking a course appear as learners but have no trainee profile to edit or remove
   const isRecord = S.trainees.some((x) => x.id === id);
@@ -116,19 +134,9 @@ export default function TraineeDetail() {
                   return (
                     <tr key={a.id}>
                       <td>
-                        <details>
-                          <summary><Link className="list-link" href={`/courses/${c.id}`}>{c.name}</Link></summary>
-                          <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7 }}>
-                            {orderedTopics(c).map((tp) => {
-                              const r = S.progress[topicKey(t.id, c.id, tp.id)];
-                              return (
-                                <li key={tp.id}>
-                                  {tp.day && <b>{tp.day} · </b>}{tp.topic} — {tp.trainer || primaryOf(c)} · {r?.done ? `Completed ${fmtDate(r.date)}` : 'Pending'}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </details>
+                        <button className="collapse-btn" onClick={() => jump(a.id)} title="Show this course's topics below">
+                          <span className="chev">▸</span> {c.name}
+                        </button>
                       </td>
                       <td>{trainerLinks(trainer)}</td>
                       <td>{a.startDate ? fmtDate(a.startDate) : '—'}</td>
@@ -151,9 +159,13 @@ export default function TraineeDetail() {
           const topics = orderedTopics(c);
           const overdue = isOverdue(a.due, x.pct);
           return (
-            <section className="card detail-panel" key={a.id}>
+            <section className="card detail-panel" key={a.id} id={`course-${a.id}`}>
               <SectionTitle
-                title={c.name}
+                title={
+                  <button className={`collapse-btn ${shut.has(a.id) ? '' : 'open'}`} aria-expanded={!shut.has(a.id)} onClick={() => flip(a.id)} title={shut.has(a.id) ? 'Expand topics' : 'Collapse topics'}>
+                    <span className="chev">▸</span> {c.name}
+                  </button>
+                }
                 sub={
                   <>
                     {x.done} of {x.total} topics complete · {x.pct}% · Primary trainer: {primaryOf(c)}
@@ -168,8 +180,8 @@ export default function TraineeDetail() {
                   </div>
                 }
               />
-              {topics.slice(0, 5).map((tp) => <TopicRow key={tp.id} traineeId={t.id} course={c} topic={tp} editable={me?.kind !== 'trainee'} />)}
-              {topics.length > 5 && <Link className="btn" href={`/tracker?trainee=${t.id}&course=${c.id}`}>Open full tracker →</Link>}
+              {!shut.has(a.id) && topics.slice(0, 5).map((tp) => <TopicRow key={tp.id} traineeId={t.id} course={c} topic={tp} editable={me?.kind !== 'trainee'} />)}
+              {!shut.has(a.id) && topics.length > 5 && <Link className="btn" href={`/tracker?trainee=${t.id}&course=${c.id}`}>Open full tracker →</Link>}
             </section>
           );
         })}

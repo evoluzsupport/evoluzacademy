@@ -71,3 +71,8 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .pmenu-id small{color:var(--muted);font-size:11px;white-space:nowrap}
 .pmenu{display:flex;align-items:center}
 @media(max-width:760px){.pmenu-id{display:none}}
+
+.collapse-btn{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.collapse-btn .chev{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#eef4ff;color:#3158b6;font-size:12px;transition:transform .2s}
+.collapse-btn.open .chev{transform:rotate(90deg)}
+.collapse-btn:hover .chev{background:#3158b6;color:#fff}
