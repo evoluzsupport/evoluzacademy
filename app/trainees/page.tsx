@@ -9,13 +9,35 @@ import { TraineeForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
 
 export default function TraineesPage() {
-  const { S, me, openModal } = usePortal();
+  const { S, me, openModal, confirm, removeTrainees } = usePortal();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const isAdmin = me?.kind === 'admin';
   const list = scopeTrainees(S, me)
     .filter((t) => match(q, t.name, t.email, t.jobRole))
     .filter((t) => !status || t.status === status);
+  const chosen = list.filter((t) => picked.has(t.id));
+  const allOn = list.length > 0 && chosen.length === list.length;
+
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const toggleAll = () => setPicked(allOn ? new Set() : new Set(list.map((t) => t.id)));
+
+  const deleteChosen = () =>
+    confirm(
+      `Delete ${chosen.length} ${chosen.length === 1 ? 'trainee' : 'trainees'}? Their assignments and progress are removed too. This cannot be undone.`,
+      () => {
+        removeTrainees(chosen.map((t) => t.id));
+        setPicked(new Set());
+      },
+      'Delete'
+    );
 
   const exportCSV = () =>
     downloadCSV(
@@ -54,16 +76,24 @@ export default function TraineesPage() {
                   <option>Active</option>
                   <option>On hold</option>
                 </select>
+                {isAdmin && chosen.length > 0 && (
+                  <button className="btn" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
+                    Delete selected ({chosen.length})
+                  </button>
+                )}
               </div>
             }
           />
         </div>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Trainee</th><th>Role</th><th>Assigned courses</th><th>Overall progress</th><th>Trainer</th><th>Status</th><th></th></tr></thead>
+            <thead><tr>{isAdmin && <th style={{ width: 34 }}><input type="checkbox" className="row-check" aria-label="Select all trainees" checked={allOn} onChange={toggleAll} /></th>}<th>Trainee</th><th>Role</th><th>Assigned courses</th><th>Overall progress</th><th>Trainer</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {list.map((t) => (
                 <tr key={t.id}>
+                  {isAdmin && (
+                    <td><input type="checkbox" className="row-check" aria-label={`Select ${t.name}`} checked={picked.has(t.id)} onChange={() => toggle(t.id)} /></td>
+                  )}
                   <td>
                     <div className="person">
                       <Avatar name={t.name} tone={t.tone} />
@@ -78,7 +108,7 @@ export default function TraineesPage() {
                   <td><Link className="btn soft" href={`/trainees/${t.id}`}>View →</Link></td>
                 </tr>
               ))}
-              {!list.length && <tr><td colSpan={7}><Empty>No trainees match this search.</Empty></td></tr>}
+              {!list.length && <tr><td colSpan={isAdmin ? 8 : 7}><Empty>No trainees match this search.</Empty></td></tr>}
             </tbody>
           </table>
         </div>

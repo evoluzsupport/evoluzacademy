@@ -29,8 +29,9 @@ interface Row {
 }
 
 export default function TrainersPage() {
-  const { S, me, openModal, confirm, update, toast, setRole } = usePortal();
+  const { S, me, openModal, confirm, update, toast, setRole, removeTrainers } = usePortal();
   const [q, setQ] = useState('');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const isAdmin = me?.kind === 'admin';
   const isTrainee = me?.kind === 'trainee';
 
@@ -89,6 +90,28 @@ export default function TrainersPage() {
       toast('Trainer removed');
     });
 
+  // only people with the Trainer access role can be removed from the directory
+  const removable = list.filter((r) => r.kind === 'trainer' && !r.id.startsWith('name:'));
+  const chosen = removable.filter((r) => picked.has(r.id));
+  const allOn = removable.length > 0 && chosen.length === removable.length;
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const toggleAll = () => setPicked(allOn ? new Set() : new Set(removable.map((r) => r.id)));
+  const deleteChosen = () =>
+    confirm(
+      `Remove ${chosen.length} ${chosen.length === 1 ? 'trainer' : 'trainers'} from the trainer directory? Courses they lead and past completions keep their name.`,
+      () => {
+        removeTrainers(chosen.map((r) => r.id));
+        setPicked(new Set());
+      },
+      'Delete'
+    );
+
   const led = (r: Row) => S.courses.filter((c) => names(c.primaryTrainer).some((n) => norm(n) === norm(r.name))).length;
   const delivered = (r: Row) =>
     Object.values(S.progress).filter((x) => x.done && names(x.trainer).some((n) => norm(n) === norm(r.name))).length;
@@ -111,12 +134,22 @@ export default function TrainersPage() {
       <div className="toolbar" style={{ marginBottom: 15 }}>
         <input className="input" placeholder="Search trainers..." aria-label="Search trainers" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="subtle">{list.length} {list.length === 1 ? 'trainer' : 'trainers'}</span>
+        {isAdmin && chosen.length > 0 && (
+          <button className="btn" style={{ marginLeft: 'auto', color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
+            Delete selected ({chosen.length})
+          </button>
+        )}
       </div>
       <section className="card table-card">
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
+                {isAdmin && (
+                  <th style={{ width: 34 }}>
+                    <input type="checkbox" className="row-check" aria-label="Select all trainers" checked={allOn} disabled={!removable.length} onChange={toggleAll} />
+                  </th>
+                )}
                 <th>{isTrainee ? 'Assigned Trainer' : 'Trainer'}</th>
                 <th>Role</th>
                 <th>Access</th>
@@ -129,6 +162,13 @@ export default function TrainersPage() {
             <tbody>
               {list.map((r) => (
                 <tr key={r.id}>
+                  {isAdmin && (
+                    <td>
+                      {r.kind === 'trainer' && !r.id.startsWith('name:') && (
+                        <input type="checkbox" className="row-check" aria-label={`Select ${r.name}`} checked={picked.has(r.id)} onChange={() => toggle(r.id)} />
+                      )}
+                    </td>
+                  )}
                   <td><div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div></td>
                   <td>{r.title || '—'}</td>
                   <td><span className={`pill ${r.kind === 'trainer' ? 'active' : r.kind === 'admin' ? 'progress' : 'neutral'}`}>{r.id.startsWith('name:') ? 'Not a user' : r.kind[0].toUpperCase() + r.kind.slice(1)}</span></td>

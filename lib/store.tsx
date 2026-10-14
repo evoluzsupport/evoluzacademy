@@ -54,6 +54,8 @@ export interface Ctx {
   saveSession: (d: SessionDraft) => string | null;
   undoSession: (id: string) => void;
   removeTrainee: (id: string) => void;
+  removeTrainees: (ids: string[]) => void;
+  removeTrainers: (ids: string[]) => void;
   removeCourse: (id: string) => void;
   removeCourses: (ids: string[]) => void;
   removeTopic: (cid: string, topicId: string) => void;
@@ -350,6 +352,24 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       toast('Trainee removed');
     };
 
+    const removeTrainees: Ctx['removeTrainees'] = (ids) => {
+      const gone = new Set(ids);
+      update((s) => {
+        s.trainees = s.trainees.filter((t) => !gone.has(t.id));
+        s.assignments = s.assignments.filter((a) => !gone.has(a.traineeId));
+        for (const k of Object.keys(s.progress)) if (gone.has(k.split('|')[0])) delete s.progress[k];
+      });
+      toast(`${ids.length} ${ids.length === 1 ? 'trainee' : 'trainees'} removed`);
+    };
+
+    const removeTrainers: Ctx['removeTrainers'] = (ids) => {
+      const gone = new Set(ids);
+      update((s) => {
+        s.trainers = s.trainers.filter((t) => !gone.has(t.id));
+      });
+      toast(`${ids.length} ${ids.length === 1 ? 'trainer' : 'trainers'} removed`);
+    };
+
     const removeCourse: Ctx['removeCourse'] = (id) => {
       update((s) => {
         s.courses = s.courses.filter((c) => c.id !== id);
@@ -515,7 +535,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return { added: fresh.length, skipped };
     };
 
-    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeCourse, removeCourses, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
+    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeTrainees, removeTrainers, removeCourse, removeCourses, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update, toast]);
 
