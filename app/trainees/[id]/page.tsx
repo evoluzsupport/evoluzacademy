@@ -2,11 +2,12 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
-import { assignmentsOf, orderedTopics, progressFor, scopeTrainees, statCourse } from '@/lib/selectors';
+import { assignmentsOf, learners, nameMatches, orderedTopics, progressFor, scopeTrainees, statCourse, topicKey } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { fmtDate, isOverdue } from '@/lib/util';
 import { Avatar, Guard, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
+import type { ReactNode } from 'react';
 import { AssignDialog, TraineeForm } from '@/components/forms';
 import { TopicRow } from '@/components/topic';
 
@@ -14,7 +15,9 @@ export default function TraineeDetail() {
   const { id } = useParams<{ id: string }>();
   const { S, me, openModal, confirm, removeTrainee, unassign } = usePortal();
   const router = useRouter();
-  const t = S.trainees.find((x) => x.id === id);
+  const t = learners(S).find((x) => x.id === id);
+  // trainers and admins taking a course appear as learners but have no trainee profile to edit or remove
+  const isRecord = S.trainees.some((x) => x.id === id);
   const visible = scopeTrainees(S, me).some((x) => x.id === id);
   const isAdmin = me?.kind === 'admin';
 
@@ -30,6 +33,21 @@ export default function TraineeDetail() {
 
   const p = progressFor(S, t);
   const as = assignmentsOf(S, t.id);
+  const real = (v?: string) => (v && v !== 'No Trainer Assigned' ? v : '');
+  /** trainer names for an assignment, each linked to that trainer's report when they are in the directory */
+  const trainerLinks = (names: string): ReactNode =>
+    names
+      .split(/ *[/&,;] */)
+      .filter(Boolean)
+      .map((n, i) => {
+        const who = [...S.trainers, ...S.admins].find((p) => nameMatches(n, p.name));
+        return (
+          <span key={n + i}>
+            {i > 0 && ', '}
+            {who ? <Link className="list-link" href={`/trainers/${who.id}`}>{n}</Link> : n}
+          </span>
+        );
+      });
   const exportProgress = () =>
     downloadCSV(
       [
@@ -60,8 +78,8 @@ export default function TraineeDetail() {
         </div>
         <div className="actions">
           <button className="btn" onClick={exportProgress}>Export progress</button>
-          {isAdmin && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit profile</button>}
-          {isAdmin && (
+          {isAdmin && isRecord && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit profile</button>}
+          {isAdmin && isRecord && (
             <button
               className="btn"
               onClick={() =>
@@ -83,6 +101,48 @@ export default function TraineeDetail() {
         <Stat label="Training contact"><span style={{ fontSize: 20 }}>{t.trainer || 'Unassigned'}</span></Stat>
         <Stat label="Learner status"><span style={{ fontSize: 20 }}>{t.status}</span></Stat>
       </div>
+      {as.length > 0 && (
+        <section className="card section-card" style={{ marginBottom: 14 }}>
+          <SectionTitle title="Courses, trainers and topics" right={<span className="subtle">Open a course to see its topics and who teaches them</span>} />
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>Course</th><th>Trainer</th><th>Start date</th><th>Due</th><th>Topics</th><th>Progress</th></tr></thead>
+              <tbody>
+                {as.map((a) => {
+                  const c = S.courses.find((x) => x.id === a.courseId);
+                  if (!c) return null;
+                  const st = statCourse(S, t.id, c);
+                  const trainer = real(a.trainer) || real(primaryOf(c)) || real(t.trainer) || 'No Trainer Assigned';
+                  return (
+                    <tr key={a.id}>
+                      <td>
+                        <details>
+                          <summary><Link className="list-link" href={`/courses/${c.id}`}>{c.name}</Link></summary>
+                          <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.7 }}>
+                            {orderedTopics(c).map((tp) => {
+                              const r = S.progress[topicKey(t.id, c.id, tp.id)];
+                              return (
+                                <li key={tp.id}>
+                                  {tp.day && <b>{tp.day} · </b>}{tp.topic} — {tp.trainer || primaryOf(c)} · {r?.done ? `Completed ${fmtDate(r.date)}` : 'Pending'}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </details>
+                      </td>
+                      <td>{trainerLinks(trainer)}</td>
+                      <td>{a.startDate ? fmtDate(a.startDate) : '—'}</td>
+                      <td>{a.due ? fmtDate(a.due) : '—'}</td>
+                      <td>{st.done} / {st.total}</td>
+                      <td><ProgressBar pct={st.pct} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <div className="grid" style={{ gap: 14 }}>
         {as.map((a) => {
           const c = S.courses.find((x) => x.id === a.courseId);

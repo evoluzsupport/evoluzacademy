@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { match, usePortal } from '@/lib/store';
 import { scopeTrainees } from '@/lib/selectors';
@@ -169,7 +170,13 @@ export default function TrainersPage() {
                       )}
                     </td>
                   )}
-                  <td><div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div></td>
+                  <td>
+                    {isTrainee || r.id.startsWith('name:') ? (
+                      <div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div>
+                    ) : (
+                      <Link className="person" href={`/trainers/${r.id}`}><Avatar name={r.name} tone={r.tone} />{r.name}</Link>
+                    )}
+                  </td>
                   <td>{r.title || '—'}</td>
                   <td><span className={`pill ${r.kind === 'trainer' ? 'active' : r.kind === 'admin' ? 'progress' : 'neutral'}`}>{r.id.startsWith('name:') ? 'Not a user' : r.kind[0].toUpperCase() + r.kind.slice(1)}</span></td>
                   <td>{r.email || <span className="subtle">{isAdmin ? 'No login email yet' : '—'}</span>}</td>

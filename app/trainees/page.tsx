@@ -17,8 +17,10 @@ export default function TraineesPage() {
   const list = scopeTrainees(S, me)
     .filter((t) => match(q, t.name, t.email, t.jobRole))
     .filter((t) => !status || t.status === status);
-  const chosen = list.filter((t) => picked.has(t.id));
-  const allOn = list.length > 0 && chosen.length === list.length;
+  // learners who are really trainers or admins have no trainee record to delete
+  const removable = list.filter((t) => S.trainees.some((x) => x.id === t.id));
+  const chosen = removable.filter((t) => picked.has(t.id));
+  const allOn = removable.length > 0 && chosen.length === removable.length;
 
   const toggle = (id: string) =>
     setPicked((p) => {
@@ -27,7 +29,7 @@ export default function TraineesPage() {
       else n.add(id);
       return n;
     });
-  const toggleAll = () => setPicked(allOn ? new Set() : new Set(list.map((t) => t.id)));
+  const toggleAll = () => setPicked(allOn ? new Set() : new Set(removable.map((t) => t.id)));
 
   const deleteChosen = () =>
     confirm(
@@ -92,12 +94,16 @@ export default function TraineesPage() {
               {list.map((t) => (
                 <tr key={t.id}>
                   {isAdmin && (
-                    <td><input type="checkbox" className="row-check" aria-label={`Select ${t.name}`} checked={picked.has(t.id)} onChange={() => toggle(t.id)} /></td>
+                    <td>
+                      {S.trainees.some((x) => x.id === t.id) && (
+                        <input type="checkbox" className="row-check" aria-label={`Select ${t.name}`} checked={picked.has(t.id)} onChange={() => toggle(t.id)} />
+                      )}
+                    </td>
                   )}
                   <td>
                     <div className="person">
                       <Avatar name={t.name} tone={t.tone} />
-                      <div>{t.name}<small style={{ display: 'block', color: '#98a3b2', fontWeight: 400, marginTop: 3 }}>{t.email}</small></div>
+                      <div><Link className="list-link" href={`/trainees/${t.id}`}>{t.name}</Link><small style={{ display: 'block', color: '#98a3b2', fontWeight: 400, marginTop: 3 }}>{t.email}</small></div>
                     </div>
                   </td>
                   <td>{t.jobRole}</td>

@@ -14,7 +14,27 @@ export const nameMatches = (value: string | undefined, name: string | undefined)
 export const topicKey = (tid: string, cid: string, topicId: string) => `${tid}|${cid}|${topicId}`;
 
 export const courseById = (S: State, id: string) => S.courses.find((c) => c.id === id);
-export const traineeById = (S: State, id: string) => S.trainees.find((t) => t.id === id);
+/**
+ * Everyone who is taking a course: the trainees, plus any trainer or admin who has been assigned one.
+ * The latter get a learner entry here (same id, so assignments and progress line up) without a second profile.
+ */
+export function learners(S: State): Trainee[] {
+  const extra: Trainee[] = [];
+  const seen = new Set(S.trainees.map((t) => t.id));
+  const add = (p: { id: string; name: string; email: string; phone?: string; tone?: string }, jobRole: string) => {
+    if (seen.has(p.id)) return;
+    const mine = S.assignments.filter((a) => a.traineeId === p.id);
+    if (!mine.length) return;
+    seen.add(p.id);
+    const first = mine.map((a) => a.assignedOn).filter(Boolean).sort()[0] ?? '';
+    extra.push({ id: p.id, name: p.name, email: p.email, password: '', phone: p.phone, tone: p.tone ?? '', jobRole, joined: first, status: 'Active', trainer: '' });
+  };
+  S.trainers.forEach((t) => add(t, 'Trainer'));
+  S.admins.forEach((a) => add(a, 'Admin'));
+  return [...S.trainees, ...extra];
+}
+
+export const traineeById = (S: State, id: string) => learners(S).find((t) => t.id === id);
 
 export const orderedTopics = (c: Course): Topic[] =>
   c.topics
@@ -62,11 +82,12 @@ export function visibleCourses(S: State, me: Me | null): Course[] {
 /** Trainees a signed-in person is allowed to see. */
 export function scopeTrainees(S: State, me: Me | null): Trainee[] {
   if (!me) return [];
-  if (me.kind === 'admin') return S.trainees;
-  if (me.kind === 'trainee') return S.trainees.filter((t) => t.id === me.id);
+  const all = learners(S);
+  if (me.kind === 'admin') return all;
+  if (me.kind === 'trainee') return all.filter((t) => t.id === me.id);
   // a trainer sees the trainees on courses they lead or teach, or whose topics they delivered
   const name = S.trainers.find((t) => t.id === me.id)?.name ?? me.name;
-  return S.trainees.filter((t) => {
+  return all.filter((t) => {
     if (t.id === me.id) return false;
     if (nameMatches(t.trainer, name)) return true;
     if (S.assignments.some((a) => a.traineeId === t.id && nameMatches(a.trainer, name))) return true;
@@ -158,3 +179,43 @@ export const plannedDays = (c: Course, selected?: string) => {
 };
 
 export type { Assignment };
+
+export interface TrainerItem {
+  a: Assignment;
+  c: Course;
+  stat: CourseStat;
+  delivered: number;
+}
+export interface TrainerLearner {
+  t: Trainee;
+  items: TrainerItem[];
+}
+
+/** Courses a named trainer leads or teaches: primary trainer, assignment trainer or a topic trainer. */
+export function coursesOfTrainer(S: State, name: string): Course[] {
+  return S.courses.filter(
+    (c) =>
+      nameMatches(c.primaryTrainer, name) ||
+      c.topics.some((tp) => nameMatches(tp.trainer, name)) ||
+      S.assignments.some((a) => a.courseId === c.id && nameMatches(a.trainer, name))
+  );
+}
+
+/** The learners a named trainer teaches, with the courses they take from that trainer. */
+export function learnersOfTrainer(S: State, name: string, pool: Trainee[]): TrainerLearner[] {
+  const out: TrainerLearner[] = [];
+  for (const t of pool) {
+    const items: TrainerItem[] = [];
+    for (const a of assignmentsOf(S, t.id)) {
+      const c = courseById(S, a.courseId);
+      if (!c) continue;
+      const delivered = Object.entries(S.progress).filter(
+        ([k, r]) => r.done && k.startsWith(`${t.id}|${c.id}|`) && nameMatches(r.trainer, name)
+      ).length;
+      const mine = nameMatches(a.trainer, name) || nameMatches(c.primaryTrainer, name) || c.topics.some((tp) => nameMatches(tp.trainer, name)) || delivered > 0;
+      if (mine) items.push({ a, c, stat: statCourse(S, t.id, c), delivered });
+    }
+    if (items.length) out.push({ t, items });
+  }
+  return out;
+}

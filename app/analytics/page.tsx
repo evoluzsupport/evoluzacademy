@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { usePortal } from '@/lib/store';
 import { allStats, assignedCourses, progressFor, nameMatches, scopeTrainees, statCourse, visibleCourses } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
@@ -98,14 +99,14 @@ export default function AnalyticsPage() {
         </section>
       </div>
       <section className="card section-card" style={{ marginTop: 17 }}>
-        <SectionTitle title="Trainer contribution" right={<span className="subtle">A topic is credited only to the person who delivered it</span>} />
+        <SectionTitle title="Trainer contribution" right={<span className="subtle">Click a trainer for their report · a topic is credited only to who delivered it</span>} />
         <div className="table-wrap">
           <table className="table">
             <thead><tr><th>Trainer</th><th>Primary courses</th><th>Trainee-topic completions</th><th>Trainees reached</th></tr></thead>
             <tbody>
               {trainerRows.map((x) => (
                 <tr key={x.r.id}>
-                  <td><div className="person"><Avatar name={x.r.name} tone={x.r.tone} />{x.r.name}</div></td>
+                  <td><Link className="person" href={`/trainers/${x.r.id}`}><Avatar name={x.r.name} tone={x.r.tone} />{x.r.name}</Link></td>
                   <td>{x.assigned}</td>
                   <td><b>{x.delivered}</b></td>
                   <td>{x.learners}</td>
@@ -126,7 +127,7 @@ export default function AnalyticsPage() {
                 const p = progressFor(S, t);
                 return (
                   <tr key={t.id}>
-                    <td><div className="person"><Avatar name={t.name} tone={t.tone} />{t.name}</div></td>
+                    <td><Link className="person" href={`/trainees/${t.id}`}><Avatar name={t.name} tone={t.tone} />{t.name}</Link></td>
                     <td>{assignedCourses(S, t.id).length}</td>
                     <td>{p.done} / {p.total}</td>
                     <td><ProgressBar pct={p.pct} /></td>

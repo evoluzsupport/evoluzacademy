@@ -80,11 +80,8 @@ export default function AssignmentsPage() {
                 return (
                   <tr key={a.id}>
                     <td>
-                      {S.trainees.some((x) => x.id === t!.id) ? (
-                        <Link className="person" href={`/trainees/${t!.id}`}><Avatar name={t!.name} tone={t!.tone} />{t!.name}</Link>
-                      ) : (
-                        <div className="person"><Avatar name={t!.name} tone={t!.tone} />{t!.name} <span className="pill neutral">{t!.jobRole}</span></div>
-                      )}
+                      <Link className="person" href={`/trainees/${t!.id}`}><Avatar name={t!.name} tone={t!.tone} />{t!.name}</Link>
+                      {!S.trainees.some((x) => x.id === t!.id) && <span className="pill neutral" style={{ marginLeft: 6 }}>{t!.jobRole}</span>}
                     </td>
                     <td>{c!.name}</td>
                     <td>
