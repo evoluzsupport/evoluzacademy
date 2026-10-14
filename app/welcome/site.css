@@ -211,3 +211,12 @@ html{scroll-behavior:smooth}
   .site *{animation:none!important;transition:none!important}
   .reveal{opacity:1;transform:none}
 }
+
+/* training video */
+.tv{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:34px;align-items:center}
+.tv-guide{display:grid;justify-items:center;gap:14px}
+.tv-player{border-radius:20px;overflow:hidden;background:#0f1b33;box-shadow:0 30px 70px #203d7033;border:1px solid var(--line);aspect-ratio:16/9;display:grid}
+.tv-player video{width:100%;height:100%;object-fit:contain;background:#0f1b33}
+.tv-missing{display:grid;place-content:center;gap:6px;text-align:center;color:#dfe8fb;padding:24px}
+.tv-missing span{font-size:13px;opacity:.75}
+@media(max-width:980px){.tv{grid-template-columns:1fr}}

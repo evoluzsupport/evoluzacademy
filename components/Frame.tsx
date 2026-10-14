@@ -121,7 +121,7 @@ function ThemeToggle() {
 }
 
 function ProfileMenu({ tone }: { tone: string }) {
-  const { me, logout } = usePortal();
+  const { S, me, logout } = usePortal();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -137,8 +137,16 @@ function ProfileMenu({ tone }: { tone: string }) {
     };
   }, [open]);
   if (!me) return null;
+  // job role: a trainer's specialty or a trainee's role; access: what they can do in the portal
+  const jobRole =
+    me.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.specialty : me.kind === 'trainee' ? S.trainees.find((t) => t.id === me.id)?.jobRole : '';
+  const access = me.kind[0].toUpperCase() + me.kind.slice(1);
   return (
     <div className="pmenu" ref={box}>
+      <div className="pmenu-id">
+        <b>{me.name}</b>
+        <small>{jobRole ? `Role: ${jobRole} · ` : ''}Access: {access}</small>
+      </div>
       <button
         className={`avatar ${TONES.includes(tone) ? tone : 'coral'}`}
         style={{ width: 33, height: 33, borderRadius: '50%', border: 0 }}
@@ -154,6 +162,7 @@ function ProfileMenu({ tone }: { tone: string }) {
           <div className="pmenu-who">
             <b>{me.name}</b>
             <small>{me.email}</small>
+            <small>{jobRole ? `Role: ${jobRole} · ` : ''}Access: {access}</small>
           </div>
           <Link href="/profile" role="menuitem" onClick={() => setOpen(false)}>My profile</Link>
           <button role="menuitem" onClick={() => { setOpen(false); logout(); router.replace('/login'); }}>Log out</button>

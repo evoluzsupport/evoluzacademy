@@ -187,11 +187,15 @@ export default function TrainersPage() {
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         {r.kind === 'trainer' ? (
                           <>
+                            <Link className="btn soft" href={`/trainers/${r.id}`}>View →</Link>
                             <button className="btn" onClick={() => openModal(<TrainerForm id={r.id} />)}>Edit</button>
                             <button className="btn" aria-label={`Remove ${r.name}`} onClick={() => del(r.id, r.name)}>×</button>
                           </>
                         ) : (
-                          <button className="btn" onClick={() => setRole(r.id, 'trainer')} title="Change this person's access role to Trainer">Make trainer</button>
+                          <>
+                            <Link className="btn soft" href={`/trainers/${r.id}`}>View →</Link>
+                            <button className="btn" onClick={() => setRole(r.id, 'trainer')} title="Change this person's access role to Trainer">Make trainer</button>
+                          </>
                         )}
                       </div>
                     </td>

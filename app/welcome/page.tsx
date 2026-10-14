@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import TourSection from './Tour';
+import TrainingVideo from './TrainingVideo';
 import './landing.css';
 import './site.css';
 
@@ -156,6 +157,7 @@ const WORDS = ['Learner', 'Trainer', 'Course', 'Session'];
 
 const NAV = [
   ['Features', '#features'],
+  ['Training Video', '#video'],
   ['How It Works', '#how'],
   ['Roles', '#roles'],
   ['Courses', '#courses'],
@@ -324,6 +326,17 @@ export default function WelcomePage() {
         </Reveal>
         <Reveal delay={120}>
           <TourSection />
+        </Reveal>
+      </section>
+
+      <section id="video" className="block">
+        <Reveal>
+          <p className="kicker">Training Video</p>
+          <h2 className="block-title">Watch How It Works</h2>
+          <p className="block-sub">A short guided video, with our robot as your host.</p>
+        </Reveal>
+        <Reveal delay={120}>
+          <TrainingVideo />
         </Reveal>
       </section>
 

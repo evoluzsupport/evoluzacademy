@@ -21,7 +21,7 @@ const STEPS: Step[] = [
 const STEP_MS = 4600;
 const CLICK_DELAY = 900;
 
-function Robot({ talking }: { talking: boolean }) {
+export function Robot({ talking }: { talking: boolean }) {
   return (
     <svg className={`lp-robot ${talking ? 'talking' : ''}`} viewBox="0 0 160 190" aria-hidden="true">
       <ellipse cx="80" cy="182" rx="40" ry="6" fill="#203d70" opacity=".14" />
