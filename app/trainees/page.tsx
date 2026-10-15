@@ -7,6 +7,9 @@ import { downloadCSV } from '@/lib/csv';
 import { Avatar, Empty, Guard, PageHead, Pill, ProgressBar, SectionTitle } from '@/components/ui';
 import { TraineeForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
+import { ViewBody, ViewSwitch, useView } from '@/components/views';
+import type { Grouper } from '@/components/views';
+import type { Trainee } from '@/lib/types';
 
 export default function TraineesPage() {
   const { S, me, openModal, confirm, removeTrainees } = usePortal();
@@ -14,6 +17,13 @@ export default function TraineesPage() {
   const [status, setStatus] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const isAdmin = me?.kind === 'admin';
+  const view = useView('trainees');
+  const groupers: Grouper<Trainee>[] = [
+    { key: 'status', label: 'Status', of: (t) => t.status },
+    { key: 'role', label: 'Role', of: (t) => t.jobRole },
+    { key: 'trainer', label: 'Assigned trainer', of: (t) => assignedTrainersOf(S, t.id, t.trainer).split(', ')[0] },
+    { key: 'course', label: 'Course', of: (t) => assignedCourses(S, t.id)[0]?.name ?? 'No course' },
+  ];
   const list = scopeTrainees(S, me)
     .filter((t) => match(q, t.name, t.email, t.jobRole))
     .filter((t) => !status || t.status === status);
@@ -78,6 +88,7 @@ export default function TraineesPage() {
                   <option>Active</option>
                   <option>On hold</option>
                 </select>
+                <ViewSwitch view={view} groupers={groupers} />
                 {isAdmin && chosen.length > 0 && (
                   <button className="btn" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
                     Delete selected ({chosen.length})
@@ -87,6 +98,37 @@ export default function TraineesPage() {
             }
           />
         </div>
+        <ViewBody
+          view={view}
+          items={list}
+          groupers={groupers}
+          id={(t) => t.id}
+          empty={<Empty>No trainees match this search.</Empty>}
+          card={(t) => (
+            <div className="vcard">
+              <div className="vtop">
+                <Link className="person" href={`/trainees/${t.id}`}><Avatar name={t.name} tone={t.tone} />{t.name}</Link>
+                {isAdmin && S.trainees.some((x) => x.id === t.id) && (
+                  <input type="checkbox" className="row-check" aria-label={`Select ${t.name}`} checked={picked.has(t.id)} onChange={() => toggle(t.id)} />
+                )}
+              </div>
+              <div className="vmail">{t.email}</div>
+              <dl className="vmeta">
+                <div><dt>Role</dt><dd>{t.jobRole || '—'}</dd></div>
+                <div><dt>Assigned trainer</dt><dd>{assignedTrainersOf(S, t.id, t.trainer) || '—'}</dd></div>
+                <div><dt>Courses</dt><dd>{assignedCourses(S, t.id).length}</dd></div>
+              </dl>
+              <ProgressBar pct={progressFor(S, t).pct} />
+              <div className="vfoot">
+                <Pill kind={t.status === 'Active' ? 'active' : 'wait'}>{t.status}</Pill>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Link className="btn soft" href={`/trainees/${t.id}`}>View →</Link>
+                  {isAdmin && S.trainees.some((x) => x.id === t.id) && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
+                </div>
+              </div>
+            </div>
+          )}
+          list={
         <div className="table-wrap">
           <table className="table">
             <thead><tr>{isAdmin && <th style={{ width: 34 }}><input type="checkbox" className="row-check" aria-label="Select all trainees" checked={allOn} onChange={toggleAll} /></th>}<th>Trainee</th><th>Role</th><th>Assigned courses</th><th>Overall progress</th><th>Assigned trainer</th><th>Status</th><th></th></tr></thead>
@@ -123,6 +165,8 @@ export default function TraineesPage() {
             </tbody>
           </table>
         </div>
+          }
+        />
       </section>
     </Guard>
   );

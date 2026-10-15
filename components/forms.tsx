@@ -28,8 +28,41 @@ export function TraineeForm({ id }: { id?: string }) {
   );
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
+  // Adding: the name is picked from the user directory and the email and role follow it.
+  const [pick, setPick] = useState('');
+  const people = [
+    ...S.trainees.map((p) => ({ id: p.id, name: p.name, email: p.email, role: p.jobRole || 'Trainee', access: 'Trainee' })),
+    ...S.trainers.map((p) => ({ id: p.id, name: p.name, email: p.email, role: p.specialty || 'Trainer', access: 'Trainer' })),
+    ...S.admins.map((p) => ({ id: p.id, name: p.name, email: p.email, role: 'Admin', access: 'Admin' })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  const chosen = people.find((p) => p.id === pick);
+  const choose = (pid: string) => {
+    setPick(pid);
+    const p = people.find((x) => x.id === pid);
+    const rec = S.trainees.find((x) => x.id === pid);
+    setF((prev) => ({
+      ...prev,
+      name: p?.name ?? '',
+      email: p?.email ?? '',
+      jobRole: p?.role ?? '',
+      joined: rec?.joined ?? prev.joined,
+      status: rec?.status ?? prev.status,
+    }));
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (!id) {
+      const rec = S.trainees.find((t) => t.id === pick);
+      if (!chosen) return toast('Pick a person from the list');
+      if (!rec) return toast(`${chosen.name} is a ${chosen.access}. Change their access on the Users page to add them as a trainee.`);
+      update((s) => {
+        Object.assign(s.trainees.find((t) => t.id === pick)!, { joined: f.joined, status: f.status });
+      });
+      closeModal();
+      toast(`${chosen.name} saved as a trainee`);
+      return;
+    }
     const name = f.name.trim();
     if (!name) return toast('Please add a trainee name');
     if (!f.email.trim()) return toast('Please add an email address');
@@ -46,12 +79,31 @@ export function TraineeForm({ id }: { id?: string }) {
   return (
     <>
       <h2>{id ? 'Edit trainee' : 'Add trainee'}</h2>
-      <p>{id ? 'Update profile details.' : 'Create a learner profile. You can assign learning paths from the trainee record.'}</p>
+      <p>{id ? 'Update profile details.' : 'Pick a person from the user list. Their email and role are filled in for you.'}</p>
       <form onSubmit={submit} noValidate>
         <div className="form-grid">
-          <Field label="Full name"><input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Asha Verma" required /></Field>
-          <Field label="Role"><input value={f.jobRole} onChange={(e) => set('jobRole', e.target.value)} placeholder="e.g. CRM Consultant" /></Field>
-          <Field label="Email (login)"><input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} required /></Field>
+          {id ? (
+            <>
+              <Field label="Full name"><input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Asha Verma" required /></Field>
+              <Field label="Role"><input value={f.jobRole} onChange={(e) => set('jobRole', e.target.value)} placeholder="e.g. CRM Consultant" /></Field>
+              <Field label="Email (login)"><input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} required /></Field>
+            </>
+          ) : (
+            <>
+              <Field label="Full name" full>
+                <select value={pick} onChange={(e) => choose(e.target.value)} required>
+                  <option value="">Select a person…</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id} disabled={p.access !== 'Trainee'}>
+                      {p.name} — {p.email || 'no email'}{p.access !== 'Trainee' ? ` (${p.access})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Email (login)"><input type="email" value={f.email} readOnly placeholder="Filled in when you pick a name" /></Field>
+              <Field label="Role"><input value={f.jobRole} readOnly placeholder="Filled in when you pick a name" /></Field>
+            </>
+          )}
           <Field label="Joined date"><input type="date" value={f.joined} onChange={(e) => set('joined', e.target.value)} /></Field>
           <Field label="Status">
             <select value={f.status} onChange={(e) => set('status', e.target.value as Trainee['status'])}>

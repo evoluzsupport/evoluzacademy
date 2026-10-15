@@ -105,3 +105,29 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .ntext em{font-style:normal;font-size:10px;color:#9aa6bb;font-weight:600}
 .narrow{color:#b3bed2;font-size:20px}
 .nitem:hover .narrow{color:#3158b6}
+
+/* view types: list / grid / group by */
+.vswitch{display:inline-flex;align-items:center;gap:8px}
+.vseg{display:inline-flex;border:1px solid #dfe5ee;border-radius:9px;overflow:hidden;background:#fff}
+.vseg button{border:0;background:transparent;padding:8px 11px;font-size:12px;font-weight:600;color:#68758b;display:inline-flex;gap:6px;align-items:center}
+.vseg button+button{border-left:1px solid #dfe5ee}
+.vseg button:hover{background:#f4f7fc;color:var(--navy)}
+.vseg button.on{background:#eef4fc;color:#2c54ae}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;padding:6px 4px 14px}
+.vcard{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px;display:grid;gap:10px;align-content:start;transition:.15s}
+.vcard:hover{border-color:#ccd8ee;box-shadow:0 10px 24px #203d7012;transform:translateY(-1px)}
+.vtop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.vmail{font-size:11px;color:#98a3b2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vmeta{margin:0;display:grid;gap:7px}
+.vmeta div{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px;border-top:1px solid #f0f2f6;padding-top:7px}
+.vmeta dt{color:#98a3b2}
+.vmeta dd{margin:0;color:#41506a;font-weight:600;text-align:right;min-width:0}
+.vfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.vgroups{display:grid;gap:12px;padding:6px 4px 10px}
+.vgroup{border:1px solid var(--line);border-radius:13px;background:#fbfcfe}
+.vgroup>summary{cursor:pointer;list-style:none;padding:12px 14px;font:700 13px Manrope;color:#26344b;display:flex;align-items:center;gap:8px}
+.vgroup>summary::-webkit-details-marker{display:none}
+.vgroup .chev{display:inline-block;transition:transform .15s;color:#7283a0}
+.vgroup[open]>summary .chev{transform:rotate(90deg)}
+.vcount{background:#eef3fe;color:#3158b6;border-radius:20px;padding:2px 8px;font-size:10px}
+.vgroup .cards{padding:2px 12px 14px}

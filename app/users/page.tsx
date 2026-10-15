@@ -6,6 +6,8 @@ import type { Kind } from '@/lib/types';
 import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
 import { ImportDialog } from '@/components/csvdialog';
 import { downloadCSV } from '@/lib/csv';
+import { ViewBody, ViewSwitch, useView } from '@/components/views';
+import type { Grouper } from '@/components/views';
 
 const ACCESS: { value: Kind; label: string }[] = [
   { value: 'admin', label: 'Admin' },
@@ -65,12 +67,19 @@ export default function UsersPage() {
   const [q, setQ] = useState('');
   const [text, setText] = useState('');
   const [bulkAccess, setBulkAccess] = useState<Kind>('admin');
+  const view = useView('users');
 
   const users = [
     ...S.admins.map((p) => ({ ...p, kind: 'admin' as Kind, tone: '', title: '' })),
     ...S.trainers.map((p) => ({ ...p, kind: 'trainer' as Kind, title: p.specialty })),
     ...S.trainees.map((p) => ({ ...p, kind: 'trainee' as Kind, title: p.jobRole })),
   ].filter((p) => match(q, p.name, p.email, p.kind, p.title));
+
+  type U = (typeof users)[number];
+  const groupers: Grouper<U>[] = [
+    { key: 'access', label: 'Access', of: (p) => ACCESS.find((a) => a.value === p.kind)?.label ?? p.kind },
+    { key: 'role', label: 'Role', of: (p) => p.title },
+  ];
 
   // one person per line: "Name, email@evoluz.tech" (or just an email)
   const addMany = (e: FormEvent) => {
@@ -122,9 +131,40 @@ export default function UsersPage() {
       <div className="toolbar" style={{ marginBottom: 15 }}>
         <input className="input" placeholder="Search users..." aria-label="Search users" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="subtle">{S.admins.length} admins · {S.trainers.length} trainers · {S.trainees.length} trainees</span>
+        <span style={{ marginLeft: 'auto' }}><ViewSwitch view={view} groupers={groupers} /></span>
       </div>
 
       <section className="card table-card" style={{ marginBottom: 17 }}>
+        <ViewBody
+          view={view}
+          items={users}
+          groupers={groupers}
+          id={(p) => p.id}
+          empty={<Empty>No users match that search.</Empty>}
+          card={(p) => (
+            <div className="vcard">
+              <div className="vtop">
+                <div className="person"><Avatar name={p.name} tone={p.tone} />{p.name}{p.id === me?.id && <span className="pill neutral">You</span>}</div>
+              </div>
+              <div className="vmail">{p.email || 'No email · cannot sign in'}</div>
+              <dl className="vmeta">
+                <div><dt>Role</dt><dd>{p.title || '—'}</dd></div>
+                <div>
+                  <dt>Access</dt>
+                  <dd>
+                    <select className="select" aria-label={`Access for ${p.name}`} value={p.kind} disabled={p.id === me?.id} onChange={(e) => setRole(p.id, e.target.value as Kind)}>
+                      {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                  </dd>
+                </div>
+              </dl>
+              <div className="vfoot" style={{ justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={() => openModal(<UserForm id={p.id} />)}>Edit</button>
+                <button className="btn" aria-label={`Remove ${p.name}`} disabled={p.id === me?.id} onClick={() => del(p.id, p.name)}>×</button>
+              </div>
+            </div>
+          )}
+          list={
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -165,7 +205,9 @@ export default function UsersPage() {
             </tbody>
           </table>
         </div>
-        {!users.length && <Empty>No users match that search.</Empty>}
+          }
+        />
+        {view.mode === 'list' && !users.length && <Empty>No users match that search.</Empty>}
       </section>
 
       <section className="card detail-panel">

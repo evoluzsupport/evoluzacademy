@@ -9,6 +9,8 @@ import type { Kind } from '@/lib/types';
 import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
 import { TrainerForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
+import { ViewBody, ViewSwitch, useView } from '@/components/views';
+import type { Grouper } from '@/components/views';
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 /** "Jyoti Raj/ Shivangi Kumari" -> ["Jyoti Raj", "Shivangi Kumari"] */
@@ -35,6 +37,11 @@ export default function TrainersPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const isAdmin = me?.kind === 'admin';
   const isTrainee = me?.kind === 'trainee';
+  const view = useView('trainers');
+  const groupers: Grouper<Row>[] = [
+    { key: 'access', label: 'Access', of: (r) => (r.id.startsWith('name:') ? 'Not a user' : r.kind[0].toUpperCase() + r.kind.slice(1)) },
+    { key: 'role', label: 'Role', of: (r) => r.title },
+  ];
 
   // Everyone the courses and sessions name as a trainer, whatever their access role is today.
   const named = useMemo(() => {
@@ -135,6 +142,7 @@ export default function TrainersPage() {
       <div className="toolbar" style={{ marginBottom: 15 }}>
         <input className="input" placeholder="Search trainers..." aria-label="Search trainers" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="subtle">{list.length} {list.length === 1 ? 'trainer' : 'trainers'}</span>
+        <ViewSwitch view={view} groupers={groupers} />
         {isAdmin && chosen.length > 0 && (
           <button className="btn" style={{ marginLeft: 'auto', color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
             Delete selected ({chosen.length})
@@ -142,6 +150,47 @@ export default function TrainersPage() {
         )}
       </div>
       <section className="card table-card">
+        <ViewBody
+          view={view}
+          items={list}
+          groupers={groupers}
+          id={(r) => r.id}
+          empty={<Empty>No trainers to show.</Empty>}
+          card={(r) => (
+            <div className="vcard">
+              <div className="vtop">
+                {isTrainee || r.id.startsWith('name:') ? (
+                  <div className="person"><Avatar name={r.name} tone={r.tone} />{r.name}</div>
+                ) : (
+                  <Link className="person" href={`/trainers/${r.id}`}><Avatar name={r.name} tone={r.tone} />{r.name}</Link>
+                )}
+                {isAdmin && r.kind === 'trainer' && !r.id.startsWith('name:') && (
+                  <input type="checkbox" className="row-check" aria-label={`Select ${r.name}`} checked={picked.has(r.id)} onChange={() => toggle(r.id)} />
+                )}
+              </div>
+              <div className="vmail">{r.email || (isAdmin ? 'No login email yet' : '—')}</div>
+              <dl className="vmeta">
+                <div><dt>Role</dt><dd>{r.title || '—'}</dd></div>
+                <div><dt>Access</dt><dd>{r.id.startsWith('name:') ? 'Not a user' : r.kind[0].toUpperCase() + r.kind.slice(1)}</dd></div>
+                <div><dt>Primary courses</dt><dd>{led(r)}</dd></div>
+                <div><dt>Completion marks</dt><dd>{delivered(r)}</dd></div>
+              </dl>
+              {isAdmin && !r.id.startsWith('name:') && (
+                <div className="vfoot" style={{ justifyContent: 'flex-end' }}>
+                  <Link className="btn soft" href={`/trainers/${r.id}`}>View →</Link>
+                  {r.kind === 'trainer' ? (
+                    <>
+                      <button className="btn" onClick={() => openModal(<TrainerForm id={r.id} />)}>Edit</button>
+                      <button className="btn" aria-label={`Remove ${r.name}`} onClick={() => del(r.id, r.name)}>×</button>
+                    </>
+                  ) : (
+                    <button className="btn" onClick={() => setRole(r.id, 'trainer')}>Make trainer</button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          list={
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -205,7 +254,9 @@ export default function TrainersPage() {
             </tbody>
           </table>
         </div>
-        {!list.length && <Empty>No trainers to show.</Empty>}
+          }
+        />
+        {view.mode === 'list' && !list.length && <Empty>No trainers to show.</Empty>}
       </section>
 
       {isAdmin && unmatched.length > 0 && (
