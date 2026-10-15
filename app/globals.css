@@ -131,3 +131,31 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .vgroup[open]>summary .chev{transform:rotate(90deg)}
 .vcount{background:#eef3fe;color:#3158b6;border-radius:20px;padding:2px 8px;font-size:10px}
 .vgroup .cards{padding:2px 12px 14px}
+
+/* list reports that open downward */
+.fold-list{display:grid;gap:8px}
+.fold{border:1px solid var(--line);border-radius:12px;background:#fff;transition:border-color .15s}
+.fold:hover{border-color:#ccd8ee}
+.fold.open{border-color:#c9d8f1;background:#fcfdff}
+.fold-head{display:flex;align-items:center;gap:10px;padding:4px 10px 4px 4px;flex-wrap:wrap}
+.fold-toggle{flex:1;min-width:220px;border:0;background:transparent;text-align:left;display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:9px}
+.fold-toggle:hover .fold-title b{color:#2c54ae}
+.fold .chev{display:inline-block;transition:transform .15s;color:#7283a0;font-size:13px}
+.fold.open>.fold-head .chev{transform:rotate(90deg)}
+.fold-title{display:grid;gap:3px;min-width:0}
+.fold-title b{font-size:13px;color:#26344b}
+.fold-title small{font-size:11px;color:#8d98a8;font-weight:500}
+.fold-right{display:flex;align-items:center;gap:8px}
+.fold-actions{display:flex;align-items:center;gap:6px}
+.fold-body{border-top:1px solid #eef1f6;padding:6px 14px 12px 38px}
+.fold-body .fold{margin-top:6px}
+.subrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #f0f2f6;font-size:12px;color:#526078}
+.subrow:last-child{border:0}
+.subrow .grow{flex:1;min-width:0}
+.subrow .grow b{display:block;color:#26344b;font-size:12px}
+.subrow .grow small{color:#98a3b2;font-size:11px}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:0 0 16px}
+.tabs button{border:0;background:transparent;padding:11px 16px;font-weight:700;font-size:13px;color:#76839a;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs button:hover{color:var(--navy)}
+.tabs button.on{color:#2c54ae;border-bottom-color:#3158b6}
+.tabs .count{margin-left:7px;background:#eef3fe;color:#3158b6;border-radius:20px;padding:2px 8px;font-size:10px}

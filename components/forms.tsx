@@ -8,6 +8,7 @@ import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
 import { FormActions } from './ui';
 import { EmailDialog, assignmentEmails } from './EmailDialog';
+import { EMAIL_ENABLED } from '@/lib/emails';
 
 const emailTaken = (S: State, email: string, id?: string) =>
   !!email &&
@@ -364,10 +365,11 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     if (start && due && due < start) return toast('Due date cannot be before the start date');
     if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer, start)) return toast('This trainee already has that course');
     toast('Course assigned');
+    if (!EMAIL_ENABLED) closeModal();
     // offer the "course assigned" emails for the trainee and the trainer
     const made = { id: 'new', traineeId: tid, courseId: cid, assignedOn: today(), startDate: start, due, trainer };
-    const emails = assignmentEmails(S, made, me?.name);
-    if (emails.length) openModal(<EmailDialog title="Course assigned: send emails" emails={emails} />, true);
+    const emails = EMAIL_ENABLED ? assignmentEmails(S, made, me?.name) : [];
+    if (EMAIL_ENABLED && emails.length) openModal(<EmailDialog title="Course assigned: send emails" emails={emails} />, true);
   };
   return (
     <>

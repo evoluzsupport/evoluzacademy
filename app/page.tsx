@@ -2,12 +2,13 @@
 import Link from 'next/link';
 import { usePortal } from '@/lib/store';
 import {
-  allStats, assignedCourses, assignedTrainersOf, assignmentsOf, recentActivity, scopeTrainees, statCourse, progressFor, orderedTopics, topicKey, visibleCourses,
+  allStats, assignedCourses, assignedTrainersOf, assignmentsOf, attentionItems, nameMatches, recentActivity, scopeTrainees, statCourse, progressFor, orderedTopics, topicKey, visibleCourses,
 } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { fmtDate, isOverdue } from '@/lib/util';
 import { Avatar, COURSE_ICONS, COURSE_TONES, Empty, PageHead, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
 import { TraineeForm } from '@/components/forms';
+import { Fold, FoldList } from '@/components/fold';
 
 function Chart() {
   const { S, me } = usePortal();
@@ -138,6 +139,37 @@ function StaffOverview() {
   );
 }
 
+/** A course's topics for one learner, as a status list. */
+function TopicStatus({ traineeId, courseId }: { traineeId: string; courseId: string }) {
+  const { S } = usePortal();
+  const c = S.courses.find((x) => x.id === courseId);
+  if (!c) return null;
+  const topics = orderedTopics(c);
+  const nextId = topics.find((tp) => !S.progress[topicKey(traineeId, c.id, tp.id)]?.done)?.id;
+  return (
+    <div>
+      {topics.map((tp) => {
+        const rec = S.progress[topicKey(traineeId, c.id, tp.id)];
+        return (
+          <div className="subrow" key={tp.id}>
+            <span className="pill neutral">{tp.day}</span>
+            <span className="grow">
+              <b>{tp.topic}</b>
+              <small>Trainer: {rec?.trainer || tp.trainer || primaryOf(c)}</small>
+            </span>
+            {rec?.done ? (
+              <Pill kind="done">Completed {rec.date ? fmtDate(rec.date) : ''}</Pill>
+            ) : (
+              <Pill kind={tp.id === nextId ? 'progress' : 'neutral'}>{tp.id === nextId ? 'Up next' : 'Pending'}</Pill>
+            )}
+          </div>
+        );
+      })}
+      {!topics.length && <span className="subtle">No topics in this course yet.</span>}
+    </div>
+  );
+}
+
 function TraineeOverview() {
   const { S, me } = usePortal();
   if (!me) return null;
@@ -160,50 +192,149 @@ function TraineeOverview() {
         <Stat label="Topics done" icon="☑" note={`of ${p.total} assigned`}>{p.done}</Stat>
         <Stat label="Overall progress" icon="◔">{p.pct}%</Stat>
       </div>
-      <div className="grid overview-grid">
-        <section className="card section-card">
-          <SectionTitle title="My learning paths" right={<span className="subtle">Resume where you left off</span>} />
-          {as.length ? (
-            <div className="table-wrap">
-              <table className="table">
-                <thead><tr><th>Course</th><th>Next topic</th><th>Progress</th><th>Due</th></tr></thead>
-                <tbody>
-                  {as.map((a) => {
-                    const c = S.courses.find((x) => x.id === a.courseId);
-                    if (!c) return null;
-                    const st = statCourse(S, t.id, c);
-                    const next = orderedTopics(c).find((tp) => !S.progress[topicKey(t.id, c.id, tp.id)]?.done);
-                    return (
-                      <tr key={a.id}>
-                        <td><b>{c.name}</b></td>
-                        <td>{next ? `${next.day} · ${next.topic}` : 'All topics completed'}</td>
-                        <td><ProgressBar pct={st.pct} /></td>
-                        <td>{a.due ? <Pill kind={isOverdue(a.due, st.pct) ? 'overdue' : 'neutral'}>{isOverdue(a.due, st.pct) ? 'Overdue · ' : ''}{fmtDate(a.due)}</Pill> : '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty>No course assigned yet. Your coordinator will assign one soon.</Empty>
-          )}
-        </section>
-        <section className="card section-card">
-          <SectionTitle title="My training team" />
-          <div className="course-list">
-            {contacts.length ? contacts.map((n) => {
-              const r = S.trainers.find((x) => x.name === n);
-              return (
-                <div className="course-row" key={n}>
-                  <Avatar name={n} tone={r?.tone} />
-                  <div className="course-copy"><b>{n}</b><small>{r?.specialty || 'Trainer'}{r?.email ? ' · ' + r.email : ''}</small></div>
-                </div>
-              );
-            }) : <Empty>No trainer assigned yet.</Empty>}
-          </div>
-        </section>
+
+      <section className="card section-card" style={{ marginBottom: 17 }}>
+        <SectionTitle title="My courses" right={<span className="subtle">Open a course to see its topics and your progress</span>} />
+        <FoldList>
+          {as.map((a, i) => {
+            const c = S.courses.find((x) => x.id === a.courseId);
+            if (!c) return null;
+            const st = statCourse(S, t.id, c);
+            const who = a.trainer && a.trainer !== 'No Trainer Assigned' ? a.trainer : primaryOf(c);
+            const late = isOverdue(a.due, st.pct);
+            return (
+              <Fold
+                key={a.id}
+                defaultOpen={i === 0}
+                title={c.name}
+                meta={`Trainer: ${who || 'Not assigned'} · Start ${a.startDate ? fmtDate(a.startDate) : 'not set'} · Due ${a.due ? fmtDate(a.due) : 'not set'}`}
+                right={
+                  <>
+                    {late && <Pill kind="overdue">Overdue</Pill>}
+                    <ProgressBar pct={st.pct} />
+                  </>
+                }
+                href={`/tracker?course=${c.id}`}
+                hrefLabel="Open course →"
+              >
+                <div className="subtle" style={{ margin: '4px 0 6px' }}>{st.done} of {st.total} topics completed</div>
+                <TopicStatus traineeId={t.id} courseId={c.id} />
+              </Fold>
+            );
+          })}
+          {!as.length && <Empty>No course assigned yet. Your coordinator will assign one soon.</Empty>}
+        </FoldList>
+      </section>
+
+      <section className="card section-card">
+        <SectionTitle title="My training team" right={<span className="subtle">Trainers on your courses</span>} />
+        <FoldList>
+          {contacts.map((n) => {
+            const r = S.trainers.find((x) => x.name === n);
+            const mine = as.filter((a) => nameMatches(a.trainer || '', n) || (!a.trainer && nameMatches(S.courses.find((c) => c.id === a.courseId)?.primaryTrainer, n)));
+            return (
+              <Fold
+                key={n}
+                title={<span className="person" style={{ display: 'inline-flex' }}><Avatar name={n} tone={r?.tone} />{n}</span>}
+                meta={`${r?.specialty || 'Trainer'}${r?.email ? ' · ' + r.email : ''}`}
+                right={<span className="subtle">{mine.length} {mine.length === 1 ? 'course' : 'courses'}</span>}
+              >
+                {mine.map((a) => {
+                  const c = S.courses.find((x) => x.id === a.courseId);
+                  return c ? (
+                    <div className="subrow" key={a.id}>
+                      <Link className="list-link grow" href={`/tracker?course=${c.id}`}>{c.name}</Link>
+                      <ProgressBar pct={statCourse(S, t.id, c).pct} />
+                    </div>
+                  ) : null;
+                })}
+                {!mine.length && <span className="subtle">No courses linked to this trainer yet.</span>}
+              </Fold>
+            );
+          })}
+          {!contacts.length && <Empty>No trainer assigned yet.</Empty>}
+        </FoldList>
+      </section>
+    </>
+  );
+}
+
+function TrainerOverview() {
+  const { S, me } = usePortal();
+  if (!me) return null;
+  const people = scopeTrainees(S, me);
+  const ids = new Set(people.map((t) => t.id));
+  const courses = visibleCourses(S, me);
+  const s = allStats(S, people);
+  const attention = attentionItems(S, people);
+  const myName = S.trainers.find((t) => t.id === me.id)?.name ?? me.name;
+  const delivered = Object.values(S.progress).filter((r) => r.done && nameMatches(r.trainer, myName)).length;
+
+  return (
+    <>
+      <PageHead title={`Welcome, ${myName.split(' ')[0]}`} desc="Your courses, trainees and what needs attention." actions={<Link className="btn primary" href="/session">＋ Log a session</Link>} />
+      <div className="grid stats">
+        <Stat label="My courses" icon="▤" note="Assigned to you">{courses.length}</Stat>
+        <Stat label="My trainees" icon="♙" note="Learning with you">{people.length}</Stat>
+        <Stat label="Topics delivered" icon="✓" note="Credited to you">{delivered}</Stat>
+        <Stat label="Overall completion" icon="◔" note="Across your trainees">{s.pct}%</Stat>
       </div>
+
+      <section className="card section-card" style={{ marginBottom: 17 }}>
+        <SectionTitle title="My courses and trainees" right={<span className="subtle">Open a course, then a trainee, to see topic progress</span>} />
+        <FoldList>
+          {courses.map((c, i) => {
+            const rows = S.assignments.filter((a) => a.courseId === c.id && ids.has(a.traineeId));
+            const avg = rows.length ? Math.round(rows.reduce((n, a) => n + statCourse(S, a.traineeId, c).pct, 0) / rows.length) : 0;
+            return (
+              <Fold
+                key={c.id}
+                defaultOpen={i === 0}
+                title={c.name}
+                meta={`${rows.length} ${rows.length === 1 ? 'trainee' : 'trainees'} · ${c.topics.length} topics · ${c.duration}`}
+                right={<ProgressBar pct={avg} />}
+                href={`/courses/${c.id}`}
+                hrefLabel="Course page →"
+              >
+                {rows.map((a) => {
+                  const t = people.find((x) => x.id === a.traineeId);
+                  if (!t) return null;
+                  const st = statCourse(S, t.id, c);
+                  return (
+                    <Fold
+                      key={a.id}
+                      title={<span className="person" style={{ display: 'inline-flex' }}><Avatar name={t.name} tone={t.tone} />{t.name}</span>}
+                      meta={`Start ${a.startDate ? fmtDate(a.startDate) : 'not set'} · Due ${a.due ? fmtDate(a.due) : 'not set'} · ${st.done}/${st.total} topics`}
+                      right={
+                        <>
+                          {isOverdue(a.due, st.pct) && <Pill kind="overdue">Overdue</Pill>}
+                          <ProgressBar pct={st.pct} />
+                        </>
+                      }
+                      href={`/trainees/${t.id}`}
+                      hrefLabel="Trainee report →"
+                    >
+                      <TopicStatus traineeId={t.id} courseId={c.id} />
+                    </Fold>
+                  );
+                })}
+                {!rows.length && <span className="subtle">No trainees on this course yet.</span>}
+              </Fold>
+            );
+          })}
+          {!courses.length && <Empty>No courses are assigned to you yet.</Empty>}
+        </FoldList>
+      </section>
+
+      <section className="card section-card">
+        <SectionTitle title="Needs attention" right={<span className="subtle">Overdue, on hold or without a course</span>} />
+        <FoldList>
+          {attention.map((x, i) => (
+            <Fold key={i} title={x.text} meta={x.sub} href={`/trainees/${x.traineeId}`} hrefLabel="Trainee report →" />
+          ))}
+          {!attention.length && <Empty>Nothing needs attention right now.</Empty>}
+        </FoldList>
+      </section>
     </>
   );
 }
@@ -211,5 +342,6 @@ function TraineeOverview() {
 export default function Overview() {
   const { me } = usePortal();
   if (!me) return null;
-  return me.kind === 'trainee' ? <TraineeOverview /> : <StaffOverview />;
+  if (me.kind === 'trainee') return <TraineeOverview />;
+  return me.kind === 'trainer' ? <TrainerOverview /> : <StaffOverview />;
 }

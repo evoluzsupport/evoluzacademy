@@ -7,7 +7,7 @@ import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { fmtDate } from '@/lib/util';
 import { EmailDialog } from '@/components/EmailDialog';
-import { welcomeEmail } from '@/lib/emails';
+import { EMAIL_ENABLED, welcomeEmail } from '@/lib/emails';
 import { Avatar, Empty, Guard, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
 
 /** Drill-down report for one trainer: the courses they teach and the learners they teach on each. */
@@ -61,7 +61,7 @@ export default function TrainerReport() {
         </div>
         <div className="actions">
           <button className="btn" onClick={exportCSV}>Export report</button>
-          <button
+          {EMAIL_ENABLED && <button
             className="btn"
             onClick={() =>
               openModal(
@@ -71,7 +71,7 @@ export default function TrainerReport() {
             }
           >
             Send invitation
-          </button>
+          </button>}
         </div>
       </div>
 

@@ -1,4 +1,7 @@
 /** HTML email templates in the portal's look (navy/blue, rounded cards). Inline styles and tables so mail apps render them. */
+/** Email buttons and the post-assignment email dialog are hidden while this is false. */
+export const EMAIL_ENABLED = false;
+
 export interface Email {
   to: string;
   toName: string;

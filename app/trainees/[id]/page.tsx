@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 import { AssignDialog, TraineeForm } from '@/components/forms';
 import { TopicRow } from '@/components/topic';
 import { EmailDialog, assignmentEmails } from '@/components/EmailDialog';
-import { welcomeEmail } from '@/lib/emails';
+import { EMAIL_ENABLED, welcomeEmail } from '@/lib/emails';
 
 export default function TraineeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -98,7 +98,7 @@ export default function TraineeDetail() {
         </div>
         <div className="actions">
           <button className="btn" onClick={exportProgress}>Export progress</button>
-          <button
+          {EMAIL_ENABLED && <button
             className="btn"
             onClick={() =>
               openModal(
@@ -111,7 +111,7 @@ export default function TraineeDetail() {
             }
           >
             Send invitation
-          </button>
+          </button>}
           {isAdmin && isRecord && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
           {isAdmin && isRecord && (
             <button
@@ -135,38 +135,6 @@ export default function TraineeDetail() {
         <Stat label="Training contact"><span style={{ fontSize: 20 }}>{t.trainer || 'Unassigned'}</span></Stat>
         <Stat label="Learner status"><span style={{ fontSize: 20 }}>{t.status}</span></Stat>
       </div>
-      {as.length > 0 && (
-        <section className="card section-card" style={{ marginBottom: 14 }}>
-          <SectionTitle title="Courses, trainers and topics" right={<span className="subtle">Open a course to see its topics and who teaches them</span>} />
-          <div className="table-wrap">
-            <table className="table">
-              <thead><tr><th>Course</th><th>Trainer</th><th>Start date</th><th>Due</th><th>Topics</th><th>Progress</th></tr></thead>
-              <tbody>
-                {as.map((a) => {
-                  const c = S.courses.find((x) => x.id === a.courseId);
-                  if (!c) return null;
-                  const st = statCourse(S, t.id, c);
-                  const trainer = real(a.trainer) || real(primaryOf(c)) || real(t.trainer) || 'No Trainer Assigned';
-                  return (
-                    <tr key={a.id}>
-                      <td>
-                        <button className="collapse-btn" onClick={() => jump(a.id)} title="Show this course's topics below">
-                          <span className="chev">▸</span> {c.name}
-                        </button>
-                      </td>
-                      <td>{trainerLinks(trainer)}</td>
-                      <td>{a.startDate ? fmtDate(a.startDate) : '—'}</td>
-                      <td>{a.due ? fmtDate(a.due) : '—'}</td>
-                      <td>{st.done} / {st.total}</td>
-                      <td><ProgressBar pct={st.pct} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
       <div className="grid" style={{ gap: 14 }}>
         {as.map((a) => {
           const c = S.courses.find((x) => x.id === a.courseId);
@@ -184,7 +152,7 @@ export default function TraineeDetail() {
                 }
                 sub={
                   <>
-                    {x.done} of {x.total} topics complete · {x.pct}% · Primary trainer: {primaryOf(c)}
+                    {x.done} of {x.total} topics complete · {x.pct}% · Trainer: {trainerLinks(real(a.trainer) || real(primaryOf(c)) || real(t.trainer) || 'No Trainer Assigned')}
                     {a.startDate && <> · <Pill kind="neutral">Starts {fmtDate(a.startDate)}</Pill></>}
                     {a.due && <> · <Pill kind={overdue ? 'overdue' : 'neutral'}>{overdue ? 'Overdue · ' : 'Due '}{fmtDate(a.due)}</Pill></>}
                   </>
@@ -192,7 +160,7 @@ export default function TraineeDetail() {
                 right={
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <ProgressBar pct={x.pct} />
-                    <button className="btn" onClick={() => openModal(<EmailDialog title="Course assigned email" emails={assignmentEmails(S, a, me?.name)} />, true)}>Email</button>
+                    {EMAIL_ENABLED && <button className="btn" onClick={() => openModal(<EmailDialog title="Course assigned email" emails={assignmentEmails(S, a, me?.name)} />, true)}>Email</button>}
                     <button className="btn" onClick={() => confirm('Remove this course from the trainee? Their topic records for it stay on file.', () => unassign(a.id), 'Remove course')}>Remove</button>
                   </div>
                 }
