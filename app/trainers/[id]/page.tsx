@@ -6,12 +6,14 @@ import { coursesOfTrainer, learnersOfTrainer, nameMatches, scopeTrainees } from 
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { fmtDate } from '@/lib/util';
+import { EmailDialog } from '@/components/EmailDialog';
+import { welcomeEmail } from '@/lib/emails';
 import { Avatar, Empty, Guard, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
 
 /** Drill-down report for one trainer: the courses they teach and the learners they teach on each. */
 export default function TrainerReport() {
   const { id } = useParams<{ id: string }>();
-  const { S, me } = usePortal();
+  const { S, me, openModal } = usePortal();
   const person =
     S.trainers.find((x) => x.id === id) ?? S.admins.find((x) => x.id === id) ?? S.trainees.find((x) => x.id === id);
 
@@ -57,7 +59,20 @@ export default function TrainerReport() {
             </div>
           </div>
         </div>
-        <div className="actions"><button className="btn" onClick={exportCSV}>Export report</button></div>
+        <div className="actions">
+          <button className="btn" onClick={exportCSV}>Export report</button>
+          <button
+            className="btn"
+            onClick={() =>
+              openModal(
+                <EmailDialog title="Send portal invitation" emails={[{ label: 'Welcome', email: welcomeEmail({ origin: window.location.origin, name: person.name, email: person.email, role }) }]} />,
+                true
+              )
+            }
+          >
+            Send invitation
+          </button>
+        </div>
       </div>
 
       <div className="grid stats">

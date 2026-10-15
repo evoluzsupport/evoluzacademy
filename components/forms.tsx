@@ -7,6 +7,7 @@ import { isAssigned, plannedDays, topicTrainer, trainerNames } from '@/lib/selec
 import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
 import { FormActions } from './ui';
+import { EmailDialog, assignmentEmails } from './EmailDialog';
 
 const emailTaken = (S: State, email: string, id?: string) =>
   !!email &&
@@ -221,13 +222,12 @@ export function TopicForm({ courseId, topicId }: { courseId: string; topicId?: s
 }
 
 export function AssignDialog({ traineeId, courseId }: { traineeId?: string; courseId?: string }) {
-  const { S, assign, closeModal, toast, me } = usePortal();
+  const { S, assign, closeModal, openModal, toast, me } = usePortal();
   const [tid, setTid] = useState(traineeId ?? '');
   const [cid, setCid] = useState(courseId ?? '');
   const [start, setStart] = useState('');
   const [due, setDue] = useState('');
   const [trainer, setTrainer] = useState('');
-  void me;
 
   // anyone can be a learner: trainees, and trainers or admins taking a course themselves
   const everyone = [
@@ -242,8 +242,11 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     e.preventDefault();
     if (start && due && due < start) return toast('Due date cannot be before the start date');
     if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer, start)) return toast('This trainee already has that course');
-    closeModal();
     toast('Course assigned');
+    // offer the "course assigned" emails for the trainee and the trainer
+    const made = { id: 'new', traineeId: tid, courseId: cid, assignedOn: today(), startDate: start, due, trainer };
+    const emails = assignmentEmails(S, made, me?.name);
+    if (emails.length) openModal(<EmailDialog title="Course assigned: send emails" emails={emails} />, true);
   };
   return (
     <>

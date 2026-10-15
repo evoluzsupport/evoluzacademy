@@ -11,6 +11,8 @@ import { Avatar, Guard, Pill, ProgressBar, SectionTitle, Stat } from '@/componen
 import type { ReactNode } from 'react';
 import { AssignDialog, TraineeForm } from '@/components/forms';
 import { TopicRow } from '@/components/topic';
+import { EmailDialog, assignmentEmails } from '@/components/EmailDialog';
+import { welcomeEmail } from '@/lib/emails';
 
 export default function TraineeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -96,6 +98,20 @@ export default function TraineeDetail() {
         </div>
         <div className="actions">
           <button className="btn" onClick={exportProgress}>Export progress</button>
+          <button
+            className="btn"
+            onClick={() =>
+              openModal(
+                <EmailDialog
+                  title="Send portal invitation"
+                  emails={[{ label: 'Welcome', email: welcomeEmail({ origin: window.location.origin, name: t.name, email: t.email, role: t.jobRole || 'Trainee' }) }]}
+                />,
+                true
+              )
+            }
+          >
+            Send invitation
+          </button>
           {isAdmin && isRecord && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
           {isAdmin && isRecord && (
             <button
@@ -176,6 +192,7 @@ export default function TraineeDetail() {
                 right={
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <ProgressBar pct={x.pct} />
+                    <button className="btn" onClick={() => openModal(<EmailDialog title="Course assigned email" emails={assignmentEmails(S, a, me?.name)} />, true)}>Email</button>
                     <button className="btn" onClick={() => confirm('Remove this course from the trainee? Their topic records for it stay on file.', () => unassign(a.id), 'Remove course')}>Remove</button>
                   </div>
                 }

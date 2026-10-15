@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { match, usePortal } from '@/lib/store';
-import { assignedCourses, progressFor, scopeTrainees } from '@/lib/selectors';
+import { assignedCourses, assignedTrainersOf, progressFor, scopeTrainees } from '@/lib/selectors';
 import { downloadCSV } from '@/lib/csv';
 import { Avatar, Empty, Guard, PageHead, Pill, ProgressBar, SectionTitle } from '@/components/ui';
 import { TraineeForm } from '@/components/forms';
@@ -47,7 +47,7 @@ export default function TraineesPage() {
         ['Name', 'Email', 'Role', 'Joined', 'Status', 'Trainer', 'Courses', 'Topics done', 'Topics total'],
         ...scopeTrainees(S, me).map((t) => {
           const p = progressFor(S, t);
-          return [t.name, t.email, t.jobRole, t.joined, t.status, t.trainer, assignedCourses(S, t.id).map((c) => c.name).join('; '), p.done, p.total];
+          return [t.name, t.email, t.jobRole, t.joined, t.status, assignedTrainersOf(S, t.id, t.trainer), assignedCourses(S, t.id).map((c) => c.name).join('; '), p.done, p.total];
         }),
       ],
       'evoluz-trainees.csv'
@@ -89,7 +89,7 @@ export default function TraineesPage() {
         </div>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr>{isAdmin && <th style={{ width: 34 }}><input type="checkbox" className="row-check" aria-label="Select all trainees" checked={allOn} onChange={toggleAll} /></th>}<th>Trainee</th><th>Role</th><th>Assigned courses</th><th>Overall progress</th><th>Trainer</th><th>Status</th><th></th></tr></thead>
+            <thead><tr>{isAdmin && <th style={{ width: 34 }}><input type="checkbox" className="row-check" aria-label="Select all trainees" checked={allOn} onChange={toggleAll} /></th>}<th>Trainee</th><th>Role</th><th>Assigned courses</th><th>Overall progress</th><th>Assigned trainer</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {list.map((t) => (
                 <tr key={t.id}>
@@ -109,7 +109,7 @@ export default function TraineesPage() {
                   <td>{t.jobRole}</td>
                   <td>{assignedCourses(S, t.id).map((c) => <span key={c.id} className="pill neutral" style={{ margin: 2 }}>{c.name}</span>)}</td>
                   <td><ProgressBar pct={progressFor(S, t).pct} /></td>
-                  <td>{t.trainer || '—'}</td>
+                  <td>{assignedTrainersOf(S, t.id, t.trainer) || '—'}</td>
                   <td><Pill kind={t.status === 'Active' ? 'active' : 'wait'}>{t.status}</Pill></td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>

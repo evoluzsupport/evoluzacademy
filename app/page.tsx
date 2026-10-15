@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePortal } from '@/lib/store';
 import {
-  allStats, assignedCourses, assignmentsOf, recentActivity, scopeTrainees, statCourse, progressFor, orderedTopics, topicKey, visibleCourses,
+  allStats, assignedCourses, assignedTrainersOf, assignmentsOf, recentActivity, scopeTrainees, statCourse, progressFor, orderedTopics, topicKey, visibleCourses,
 } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { fmtDate, isOverdue } from '@/lib/util';
@@ -149,7 +149,7 @@ function TraineeOverview() {
     const c = S.courses.find((x) => x.id === a.courseId);
     return c && statCourse(S, t.id, c).pct >= 100;
   }).length;
-  const contacts = [...new Set([t.trainer, ...as.map((a) => primaryOf(S.courses.find((c) => c.id === a.courseId)))].filter(Boolean))];
+  const contacts = assignedTrainersOf(S, t.id, t.trainer).split(', ').filter(Boolean);
 
   return (
     <>

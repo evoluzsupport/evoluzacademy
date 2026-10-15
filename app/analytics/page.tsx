@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePortal } from '@/lib/store';
-import { allStats, assignedCourses, progressFor, nameMatches, scopeTrainees, statCourse, visibleCourses } from '@/lib/selectors';
+import { allStats, assignedCourses, assignedTrainersOf, progressFor, nameMatches, scopeTrainees, statCourse, visibleCourses } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { Avatar, Empty, Guard, PageHead, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
         <SectionTitle title="Trainee progress overview" right={<span className="subtle">Topic completion across assigned paths</span>} />
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Trainee</th><th>Courses</th><th>Completed topics</th><th>Progress</th><th>Training contact</th><th>Status</th></tr></thead>
+            <thead><tr><th>Trainee</th><th>Courses</th><th>Completed topics</th><th>Progress</th><th>Assigned trainer</th><th>Status</th></tr></thead>
             <tbody>
               {trainees.map((t) => {
                 const p = progressFor(S, t);
@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
                     <td>{assignedCourses(S, t.id).length}</td>
                     <td>{p.done} / {p.total}</td>
                     <td><ProgressBar pct={p.pct} /></td>
-                    <td>{t.trainer || '—'}</td>
+                    <td>{assignedTrainersOf(S, t.id, t.trainer) || '—'}</td>
                     <td><Pill kind={t.status === 'Active' ? 'active' : 'wait'}>{t.status}</Pill></td>
                   </tr>
                 );

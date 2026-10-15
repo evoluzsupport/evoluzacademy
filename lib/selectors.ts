@@ -44,6 +44,22 @@ export const orderedTopics = (c: Course): Topic[] =>
 
 export const assignmentsOf = (S: State, traineeId: string) => S.assignments.filter((a) => a.traineeId === traineeId);
 
+/**
+ * The trainers named on the learner's own course assignments (My Course > Assigned trainer),
+ * joined for display. The course's primary trainer is only a fallback when an assignment
+ * has no trainer, and the learner's contact trainer only when nothing is assigned.
+ */
+export const assignedTrainersOf = (S: State, traineeId: string, contact = ''): string => {
+  const real = (v?: string) => (v && v !== 'No Trainer Assigned' ? v : '');
+  const out: string[] = [];
+  for (const a of assignmentsOf(S, traineeId)) {
+    const c = courseById(S, a.courseId);
+    const v = real(a.trainer) || (c ? real(primaryOf(c)) : '');
+    if (v && !out.some((x) => x.toLowerCase() === v.toLowerCase())) out.push(v);
+  }
+  return out.length ? out.join(', ') : real(contact);
+};
+
 export const assignedCourses = (S: State, traineeId: string): Course[] =>
   assignmentsOf(S, traineeId)
     .map((a) => courseById(S, a.courseId))
