@@ -4,17 +4,26 @@ import { useState } from 'react';
 import { match, usePortal } from '@/lib/store';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
-import { Empty, Guard, PageHead } from '@/components/ui';
+import { Empty, Guard, PageHead, SectionTitle } from '@/components/ui';
+import { ViewBody, ViewSwitch, useView } from '@/components/views';
+import type { Grouper } from '@/components/views';
+import type { Course } from '@/lib/types';
 import { CourseForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
 
 export default function CoursesPage() {
   const { S, me, openModal, confirm, removeCourses } = usePortal();
   const [q, setQ] = useState('');
-  const [group, setGroup] = useState('');
+  const [cat, setCat] = useState('');
+  const view = useView('courses');
+  const groupers: Grouper<Course>[] = [
+    { key: 'category', label: 'Category', of: (c) => c.group },
+    { key: 'trainer', label: 'Primary trainer', of: (c) => primaryOf(c) },
+    { key: 'duration', label: 'Duration', of: (c) => c.duration },
+  ];
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const isAdmin = me?.kind === 'admin';
-  const list = S.courses.filter((c) => match(q, c.name, c.group)).filter((c) => !group || c.group === group);
+  const list = S.courses.filter((c) => match(q, c.name, c.group)).filter((c) => !cat || c.group === cat);
   const chosen = list.filter((c) => picked.has(c.id));
   const allOn = list.length > 0 && chosen.length === list.length;
 
@@ -59,20 +68,51 @@ export default function CoursesPage() {
           </>
         }
       />
-      <div className="toolbar" style={{ marginBottom: 15 }}>
-        <input className="input" placeholder="Search courses..." aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="select" aria-label="Category" value={group} onChange={(e) => setGroup(e.target.value)}>
-          <option value="">All categories</option>
-          {['Common', 'Zoho apps', 'Role-based'].map((x) => <option key={x}>{x}</option>)}
-        </select>
-        <span className="subtle">{list.length} paths</span>
-        {isAdmin && chosen.length > 0 && (
-          <button className="btn" style={{ marginLeft: 'auto', color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
-            Delete selected ({chosen.length})
-          </button>
-        )}
-      </div>
       <section className="card table-card">
+        <div style={{ padding: '10px 5px 3px' }}>
+          <SectionTitle
+            title={<>All courses <span className="subtle">· {list.length} {list.length === 1 ? 'path' : 'paths'}</span></>}
+            right={
+              <div className="toolbar">
+                <input className="input" placeholder="Search courses..." aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} />
+                <select className="select" aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
+                  <option value="">All categories</option>
+                  {['Common', 'Zoho apps', 'Role-based'].map((x) => <option key={x}>{x}</option>)}
+                </select>
+                <ViewSwitch view={view} groupers={groupers} />
+                {isAdmin && chosen.length > 0 && (
+                  <button className="btn" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
+                    Delete selected ({chosen.length})
+                  </button>
+                )}
+              </div>
+            }
+          />
+        </div>
+        <ViewBody
+          view={view}
+          items={list}
+          groupers={groupers}
+          id={(c) => c.id}
+          empty={<Empty>{S.courses.length ? 'No courses match your search.' : 'No courses yet. Use Import curriculum or New course to add one.'}</Empty>}
+          card={(c) => (
+            <div className="vcard">
+              <div className="vtop">
+                <Link href={`/courses/${c.id}`} className="list-link">{c.name}</Link>
+                {isAdmin && (
+                  <input type="checkbox" className="row-check" aria-label={`Select ${c.name}`} checked={picked.has(c.id)} onChange={() => toggle(c.id)} />
+                )}
+              </div>
+              <div><span className={`pill ${c.group === 'Common' ? 'active' : c.group === 'Role-based' ? 'wait' : 'progress'}`}>{c.group}</span></div>
+              <dl className="vmeta">
+                <div><dt>Duration</dt><dd>{c.duration}</dd></div>
+                <div><dt>Topics</dt><dd>{c.topics.length}</dd></div>
+                <div><dt>Primary trainer</dt><dd>{primaryOf(c)}</dd></div>
+                <div><dt>Learners</dt><dd>{S.assignments.filter((a) => a.courseId === c.id).length}</dd></div>
+              </dl>
+            </div>
+          )}
+          list={
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -109,7 +149,9 @@ export default function CoursesPage() {
             </tbody>
           </table>
         </div>
-        {!list.length && <Empty>{S.courses.length ? 'No courses match your search.' : 'No courses yet. Use Import curriculum or New course to add one.'}</Empty>}
+          }
+        />
+        {view.mode === 'list' && !list.length && <Empty>{S.courses.length ? 'No courses match your search.' : 'No courses yet. Use Import curriculum or New course to add one.'}</Empty>}
       </section>
     </Guard>
   );
