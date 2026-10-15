@@ -42,7 +42,7 @@ function UserForm({ id }: { id?: string }) {
 }
 
 export default function UsersPage() {
-  const { S, me, openModal, confirm, removeUser, addPeople, toast } = usePortal();
+  const { S, me, openModal, confirm, removeUser, addPeople, setRole, toast } = usePortal();
   const [q, setQ] = useState('');
   const [text, setText] = useState('');
   const view = useView('users');
@@ -74,6 +74,19 @@ export default function UsersPage() {
     const { added, skipped } = addPeople(list);
     if (added) setText('');
     toast(`${added} ${added === 1 ? 'user' : 'users'} added` + (skipped.length ? ` · skipped ${skipped.length} (invalid or already listed)` : ''));
+  };
+
+  // anyone who is not yet an admin can be given admin access
+  const [adminPick, setAdminPick] = useState('');
+  const candidates = [
+    ...S.trainers.map((p) => ({ ...p, listed: 'Trainer' })),
+    ...S.trainees.map((p) => ({ ...p, listed: 'Trainee' })),
+    ...S.users.map((p) => ({ ...p, listed: 'Not enrolled' })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  const addAdmin = (e: FormEvent) => {
+    e.preventDefault();
+    if (!adminPick) return toast('Pick a person from the list');
+    if (setRole(adminPick, 'admin')) setAdminPick('');
   };
 
   const del = (id: string, name: string) =>
@@ -179,6 +192,35 @@ export default function UsersPage() {
           </div>
           <div className="modal-actions"><button className="btn primary">Add users</button></div>
         </form>
+      </section>
+
+      <section className="card detail-panel" style={{ marginTop: 17 }}>
+        <h3 style={{ font: '700 14px Manrope', margin: '0 0 6px' }}>Add admin</h3>
+        <p className="subtle" style={{ lineHeight: 1.6, margin: '0 0 12px' }}>
+          Admins can manage users, courses, trainees and trainers. Pick a person from the list to give them admin access.
+        </p>
+        <form onSubmit={addAdmin}>
+          <div className="form-grid">
+            <div className="field full">
+              <label htmlFor="a-pick">Person</label>
+              <select id="a-pick" value={adminPick} onChange={(e) => setAdminPick(e.target.value)}>
+                <option value="">Choose a person…</option>
+                {candidates.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}{p.email ? ` · ${p.email}` : ''} ({p.listed})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="modal-actions"><button className="btn primary" disabled={!adminPick}>Make admin</button></div>
+        </form>
+        <div style={{ marginTop: 14 }}>
+          <b style={{ fontSize: 12.5 }}>Current admins ({S.admins.length})</b>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {S.admins.map((a) => (
+              <span key={a.id} className="person"><Avatar name={a.name} />{a.name}{a.id === me?.id && <span className="pill neutral">You</span>}</span>
+            ))}
+          </div>
+        </div>
       </section>
     </Guard>
   );
