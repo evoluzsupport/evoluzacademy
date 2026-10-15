@@ -201,12 +201,14 @@ export function TrainerForm({ id }: { id?: string }) {
               <Field label="Email (login)"><input type="email" value={chosen?.email ?? ''} readOnly placeholder="Filled in when you pick a name" /></Field>
               <Field label="Role"><input value={role} onChange={(e) => setRoleText(e.target.value)} placeholder="e.g. Zoho CRM" /></Field>
               <Field label="Access"><input value="Trainer" readOnly /></Field>
-              <Field label={chosen && chosen.kind !== 'user' ? 'Course they will lead' : 'Course they will lead (optional)'} full>
-                <select value={lead} onChange={(e) => setLead(e.target.value)} required={!!chosen && chosen.kind !== 'user'}>
-                  <option value="">Select course…</option>
-                  {S.courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </Field>
+              {chosen && chosen.kind !== 'user' && (
+                <Field label="Course they will lead" full>
+                  <select value={lead} onChange={(e) => setLead(e.target.value)} required>
+                    <option value="">Select course…</option>
+                    {S.courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </Field>
+              )}
             </>
           )}
         </div>
@@ -335,13 +337,26 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const [due, setDue] = useState('');
   const [trainer, setTrainer] = useState('');
 
-  // anyone can be a learner: trainees, and trainers or admins taking a course themselves
-  const everyone = [
-    ...S.trainees.map((t) => ({ id: t.id, name: t.name, label: t.jobRole || 'Trainee' })),
-    ...S.trainers.map((t) => ({ id: t.id, name: t.name, label: 'Trainer' })),
-    ...S.admins.map((t) => ({ id: t.id, name: t.name, label: 'Admin' })),
+  const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  // Trainee: from the trainee data (the Trainees list). A trainer or admin joins it only when they are
+  // being added as a trainee, which passes their id in.
+  const traineePool = [
+    ...learners(S).map((t) => ({ id: t.id, name: t.name, label: t.jobRole || 'Trainee' })),
+    ...[...S.trainers, ...S.admins].filter((p) => p.id === traineeId && !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainee' })),
   ].sort((a, b) => a.name.localeCompare(b.name));
-  const trainees = everyone.filter((t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))));
+  // Trainer: from the trainer data (the Trainers list), plus anyone named as a course lead.
+  const trainerPool = [
+    ...new Set([
+      ...S.trainers.map((t) => t.name),
+      ...[...S.trainees, ...S.admins].filter((p) => S.courses.some((c) => nameMatches(c.primaryTrainer, p.name))).map((p) => p.name),
+    ]),
+  ].sort((a, b) => a.localeCompare(b));
+  const pickedTrainee = traineePool.find((t) => t.id === tid);
+  // one person cannot be both the trainee and the trainer on the same course
+  const trainees = traineePool.filter(
+    (t) => !same(t.name, trainer) && (t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))))
+  );
+  const trainerOptions = trainerPool.filter((n) => !same(n, pickedTrainee?.name));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
 
   const submit = (e: FormEvent) => {
@@ -357,12 +372,12 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   return (
     <>
       <h2>Assign a course</h2>
-      <p>Their topic progress starts separately for each learning path.</p>
+      <p>The trainee comes from the trainee list and the trainer from the trainer list. Progress starts separately for each learning path.</p>
       <form onSubmit={submit}>
         <div className="form-grid">
-          <Field label="Learner" full>
+          <Field label="Trainee" full>
             <select value={tid} onChange={(e) => setTid(e.target.value)} disabled={!!traineeId} required>
-              <option value="">Select learner…</option>
+              <option value="">Select trainee…</option>
               {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}</option>)}
             </select>
           </Field>
@@ -375,7 +390,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
           <Field label="Trainer" full>
             <select value={trainer} onChange={(e) => setTrainer(e.target.value)} required>
               <option value="">Select trainer…</option>
-              {trainerNames(S).map((n) => <option key={n}>{n}</option>)}
+              {trainerOptions.map((n) => <option key={n}>{n}</option>)}
             </select>
           </Field>
           <Field label="Start date"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
