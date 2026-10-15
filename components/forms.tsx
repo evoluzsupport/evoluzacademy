@@ -102,6 +102,7 @@ export function TraineeForm({ id }: { id?: string }) {
               </Field>
               <Field label="Email (login)"><input type="email" value={f.email} readOnly placeholder="Filled in when you pick a name" /></Field>
               <Field label="Role"><input value={f.jobRole} readOnly placeholder="Filled in when you pick a name" /></Field>
+              <Field label="Access"><input value={chosen?.access ?? ''} readOnly placeholder="Filled in when you pick a name" /></Field>
             </>
           )}
           <Field label="Joined date"><input type="date" value={f.joined} onChange={(e) => set('joined', e.target.value)} /></Field>

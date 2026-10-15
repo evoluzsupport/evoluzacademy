@@ -6,7 +6,7 @@ import { scopeTrainees } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import type { Kind } from '@/lib/types';
-import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
+import { Avatar, Empty, Guard, PageHead, SectionTitle } from '@/components/ui';
 import { TrainerForm } from '@/components/forms';
 import { ImportDialog } from '@/components/csvdialog';
 import { ViewBody, ViewSwitch, useView } from '@/components/views';
@@ -139,17 +139,23 @@ export default function TrainersPage() {
           )
         }
       />
-      <div className="toolbar" style={{ marginBottom: 15 }}>
-        <input className="input" placeholder="Search trainers..." aria-label="Search trainers" value={q} onChange={(e) => setQ(e.target.value)} />
-        <span className="subtle">{list.length} {list.length === 1 ? 'trainer' : 'trainers'}</span>
-        <ViewSwitch view={view} groupers={groupers} />
-        {isAdmin && chosen.length > 0 && (
-          <button className="btn" style={{ marginLeft: 'auto', color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
-            Delete selected ({chosen.length})
-          </button>
-        )}
-      </div>
       <section className="card table-card">
+        <div style={{ padding: '10px 5px 3px' }}>
+          <SectionTitle
+            title={<>{isTrainee ? 'My trainers' : 'All trainers'} <span className="subtle">· {list.length} {list.length === 1 ? 'person' : 'people'}</span></>}
+            right={
+              <div className="toolbar">
+                <input className="input" placeholder="Search trainers..." aria-label="Search trainers" value={q} onChange={(e) => setQ(e.target.value)} />
+                <ViewSwitch view={view} groupers={groupers} />
+                {isAdmin && chosen.length > 0 && (
+                  <button className="btn" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={deleteChosen}>
+                    Delete selected ({chosen.length})
+                  </button>
+                )}
+              </div>
+            }
+          />
+        </div>
         <ViewBody
           view={view}
           items={list}
