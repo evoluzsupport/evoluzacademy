@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 import { orderedTopics, scopeTrainees, statCourse, topicKey } from '@/lib/selectors';
 import { primaryOf } from '@/lib/seed';
+import { fmtDate } from '@/lib/util';
 import { downloadCSV, slug } from '@/lib/csv';
 import { Avatar, Empty, Guard, Pill, ProgressBar, SectionTitle } from '@/components/ui';
 import { visibleCourses } from '@/lib/selectors';
@@ -85,13 +86,22 @@ export default function CourseDetail() {
           <section className="card detail-panel">
             <SectionTitle title="Assigned learners" right={<button className="btn soft" onClick={() => openModal(<AssignDialog courseId={c.id} />)}>＋ Assign trainee</button>} />
             {learners.length ? (
-              learners.map((t) => (
-                <Link key={t!.id} href={`/trainees/${t!.id}`} className="course-row" style={{ margin: '13px 0' }}>
-                  <Avatar name={t!.name} tone={t!.tone} />
-                  <div className="course-copy"><b>{t!.name}</b><small>{t!.jobRole}</small></div>
-                  <div><ProgressBar pct={statCourse(S, t!.id, c).pct} /></div>
-                </Link>
-              ))
+              learners.map((t) => {
+                const a = S.assignments.find((x) => x.traineeId === t!.id && x.courseId === c.id);
+                const who = a?.trainer && a.trainer !== 'No Trainer Assigned' ? a.trainer : primaryOf(c);
+                return (
+                  <Link key={t!.id} href={`/trainees/${t!.id}`} className="course-row" style={{ margin: '13px 0' }}>
+                    <Avatar name={t!.name} tone={t!.tone} />
+                    <div className="course-copy">
+                      <b>{t!.name}</b>
+                      <small>{t!.jobRole}</small>
+                      <small style={{ display: 'block', marginTop: 3 }}>Trainer: {who || 'Not assigned'}</small>
+                      <small style={{ display: 'block', marginTop: 2 }}>Start date: {a?.startDate ? fmtDate(a.startDate) : 'Not set'}</small>
+                    </div>
+                    <div><ProgressBar pct={statCourse(S, t!.id, c).pct} /></div>
+                  </Link>
+                );
+              })
             ) : (
               <Empty>No learners assigned to this course.</Empty>
             )}
