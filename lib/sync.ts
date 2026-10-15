@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Admin, Assignment, Course, ProgressRec, Session, State, Trainee, Trainer } from './types';
+import type { Admin, AppUser, Assignment, Course, ProgressRec, Session, State, Trainee, Trainer } from './types';
 
 type Row = Record<string, unknown>;
 type Role = 'admin' | 'trainer' | 'trainee';
@@ -11,6 +11,7 @@ export const emptyState = (): State => ({
   admins: [],
   trainers: [],
   trainees: [],
+  users: [],
   courses: [],
   assignments: [],
   progress: {},
@@ -48,11 +49,13 @@ const TABLES: Table[] = [
     rows: (s) => [
       ...s.admins.map((a) => person(a, 'admin', {})),
       ...s.trainers.map((t) => person(t, 'trainer', { tone: t.tone, specialty: nul(t.specialty) })),
+      // a directory entry is a trainee row with no joined date; enrolled trainees always have one
+      ...s.users.map((u) => person(u, 'trainee', {})),
       ...s.trainees.map((t) =>
         person(t, 'trainee', {
           tone: t.tone,
           job_role: nul(t.jobRole),
-          joined: nul(t.joined),
+          joined: t.joined || new Date().toISOString().slice(0, 10),
           status: t.status,
           trainer_name: nul(t.trainer),
         })
@@ -232,6 +235,7 @@ export async function loadRemote(): Promise<State> {
     if (p.role === 'admin') s.admins.push(base as Admin);
     else if (p.role === 'trainer')
       s.trainers.push({ ...base, specialty: str(p.specialty), tone: str(p.tone) } as Trainer);
+    else if (!p.joined && !p.job_role) s.users.push(base as AppUser);
     else
       s.trainees.push({
         ...base,

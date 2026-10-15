@@ -2,34 +2,22 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { match, usePortal } from '@/lib/store';
-import type { Kind } from '@/lib/types';
 import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
 import { ImportDialog } from '@/components/csvdialog';
 import { downloadCSV } from '@/lib/csv';
 import { ViewBody, ViewSwitch, useView } from '@/components/views';
 import type { Grouper } from '@/components/views';
 
-const ACCESS: { value: Kind; label: string }[] = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'trainer', label: 'Trainer' },
-  { value: 'trainee', label: 'Trainee' },
-];
-
 function UserForm({ id }: { id?: string }) {
-  const { S, me, saveUser, closeModal, toast } = usePortal();
-  const admin = S.admins.find((x) => x.id === id);
-  const trainer = S.trainers.find((x) => x.id === id);
-  const trainee = S.trainees.find((x) => x.id === id);
-  const cur = admin ?? trainer ?? trainee;
+  const { S, saveUser, closeModal, toast } = usePortal();
+  const cur = [...S.admins, ...S.trainers, ...S.trainees, ...S.users].find((x) => x.id === id);
   const [name, setName] = useState(cur?.name ?? '');
   const [email, setEmail] = useState(cur?.email ?? '');
   const [phone, setPhone] = useState(cur?.phone ?? '');
-  const [access, setAccess] = useState<Kind>(admin ? 'admin' : trainer ? 'trainer' : trainee ? 'trainee' : 'trainee');
-  const [title, setTitle] = useState(trainer?.specialty ?? trainee?.jobRole ?? '');
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const err = saveUser(id ?? null, { name, email, phone, access, title });
+    const err = saveUser(id ?? null, { name, email, phone });
     if (err) toast(err);
     else closeModal();
   };
@@ -37,20 +25,11 @@ function UserForm({ id }: { id?: string }) {
   return (
     <>
       <h2>{id ? 'Edit user' : 'Add user'}</h2>
-      <p>Users sign in with the email listed here. Access decides what they can do in the portal.</p>
+      <p>Users sign in with the email listed here. They become a trainee or trainer when you add them in the Trainee or Trainer form.</p>
       <form onSubmit={submit} noValidate>
         <div className="form-grid">
           <div className="field"><label htmlFor="u-n">Name</label><input id="u-n" value={name} onChange={(e) => setName(e.target.value)} required /></div>
           <div className="field"><label htmlFor="u-e">Email</label><input id="u-e" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-          <div className="field">
-            <label htmlFor="u-a">Access</label>
-            <select id="u-a" value={access} disabled={!!id && id === me?.id} onChange={(e) => setAccess(e.target.value as Kind)}>
-              {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-          </div>
-          {access !== 'admin' && (
-            <div className="field"><label htmlFor="u-t">Role</label><input id="u-t" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={access === 'trainer' ? 'e.g. Zoho CRM' : 'e.g. CRM Consultant'} /></div>
-          )}
           <div className="field"><label htmlFor="u-p">Phone</label><input id="u-p" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
         </div>
         <div className="modal-actions">
@@ -63,23 +42,22 @@ function UserForm({ id }: { id?: string }) {
 }
 
 export default function UsersPage() {
-  const { S, me, openModal, confirm, removeUser, addPeople, setRole, toast } = usePortal();
+  const { S, me, openModal, confirm, removeUser, addPeople, toast } = usePortal();
   const [q, setQ] = useState('');
   const [text, setText] = useState('');
-  const [bulkAccess, setBulkAccess] = useState<Kind>('admin');
   const view = useView('users');
 
+  // Access is read from the trainee and trainer lists, never set here.
   const users = [
-    ...S.admins.map((p) => ({ ...p, kind: 'admin' as Kind, tone: '', title: '' })),
-    ...S.trainers.map((p) => ({ ...p, kind: 'trainer' as Kind, title: p.specialty })),
-    ...S.trainees.map((p) => ({ ...p, kind: 'trainee' as Kind, title: p.jobRole })),
-  ].filter((p) => match(q, p.name, p.email, p.kind, p.title));
-
+    ...S.admins.map((p) => ({ ...p, listed: 'Admin' })),
+    ...S.trainers.map((p) => ({ ...p, listed: 'Trainer' })),
+    ...S.trainees.map((p) => ({ ...p, listed: 'Trainee' })),
+    ...S.users.map((p) => ({ ...p, listed: 'Not enrolled' })),
+  ]
+    .filter((p) => match(q, p.name, p.email, p.listed))
+    .sort((a, b) => a.name.localeCompare(b.name));
   type U = (typeof users)[number];
-  const groupers: Grouper<U>[] = [
-    { key: 'access', label: 'Access', of: (p) => ACCESS.find((a) => a.value === p.kind)?.label ?? p.kind },
-    { key: 'role', label: 'Role', of: (p) => p.title },
-  ];
+  const groupers: Grouper<U>[] = [{ key: 'listed', label: 'Listed as', of: (p) => p.listed }];
 
   // one person per line: "Name, email@evoluz.tech" (or just an email)
   const addMany = (e: FormEvent) => {
@@ -90,15 +68,12 @@ export default function UsersPage() {
       .filter(Boolean)
       .map((l) => {
         const parts = l.split(/[,;\t]/).map((x) => x.trim());
-        return parts.length > 1 ? { name: parts[0], email: parts[1], role: bulkAccess } : { name: '', email: parts[0], role: bulkAccess };
+        return parts.length > 1 ? { name: parts[0], email: parts[1] } : { name: '', email: parts[0] };
       });
     if (!list.length) return toast('Add at least one email');
     const { added, skipped } = addPeople(list);
     if (added) setText('');
-    toast(
-      `${added} ${added === 1 ? 'user' : 'users'} added as ${bulkAccess}` +
-        (skipped.length ? ` · skipped ${skipped.length} (invalid or already listed)` : '')
-    );
+    toast(`${added} ${added === 1 ? 'user' : 'users'} added` + (skipped.length ? ` · skipped ${skipped.length} (invalid or already listed)` : ''));
   };
 
   const del = (id: string, name: string) =>
@@ -108,19 +83,11 @@ export default function UsersPage() {
     <Guard kinds={['admin']}>
       <PageHead
         title="Users"
-        desc="Everyone who can sign in to Evoluz Academy, with their access. People sign in with Zoho using the email listed here."
+        desc="Everyone who can sign in to Evoluz Academy. Add people here first, then add them as a trainee or trainer to give them that access."
         actions={
           <>
             <button className="btn" onClick={() => openModal(<ImportDialog kind="users" />)}>Import CSV</button>
-            <button
-              className="btn"
-              onClick={() =>
-                downloadCSV(
-                  [['Name', 'Email', 'Access', 'Role', 'Phone'], ...users.map((u) => [u.name, u.email, u.kind, u.title, u.phone ?? ''])],
-                  'evoluz-users.csv'
-                )
-              }
-            >
+            <button className="btn" onClick={() => downloadCSV([['Name', 'Email', 'Phone', 'Listed as'], ...users.map((u) => [u.name, u.email, u.phone ?? '', u.listed])], 'evoluz-users.csv')}>
               Export CSV
             </button>
             <button className="btn primary" onClick={() => openModal(<UserForm />)}>＋ Add user</button>
@@ -130,7 +97,7 @@ export default function UsersPage() {
 
       <div className="toolbar" style={{ marginBottom: 15 }}>
         <input className="input" placeholder="Search users..." aria-label="Search users" value={q} onChange={(e) => setQ(e.target.value)} />
-        <span className="subtle">{S.admins.length} admins · {S.trainers.length} trainers · {S.trainees.length} trainees</span>
+        <span className="subtle">{S.admins.length} admins · {S.trainers.length} trainers · {S.trainees.length} trainees · {S.users.length} not enrolled</span>
         <span style={{ marginLeft: 'auto' }}><ViewSwitch view={view} groupers={groupers} /></span>
       </div>
 
@@ -144,19 +111,12 @@ export default function UsersPage() {
           card={(p) => (
             <div className="vcard">
               <div className="vtop">
-                <div className="person"><Avatar name={p.name} tone={p.tone} />{p.name}{p.id === me?.id && <span className="pill neutral">You</span>}</div>
+                <div className="person"><Avatar name={p.name} />{p.name}{p.id === me?.id && <span className="pill neutral">You</span>}</div>
               </div>
               <div className="vmail">{p.email || 'No email · cannot sign in'}</div>
               <dl className="vmeta">
-                <div><dt>Role</dt><dd>{p.title || '—'}</dd></div>
-                <div>
-                  <dt>Access</dt>
-                  <dd>
-                    <select className="select" aria-label={`Access for ${p.name}`} value={p.kind} disabled={p.id === me?.id} onChange={(e) => setRole(p.id, e.target.value as Kind)}>
-                      {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </dd>
-                </div>
+                <div><dt>Phone</dt><dd>{p.phone || '—'}</dd></div>
+                <div><dt>Listed as</dt><dd>{p.listed}</dd></div>
               </dl>
               <div className="vfoot" style={{ justifyContent: 'flex-end' }}>
                 <button className="btn" onClick={() => openModal(<UserForm id={p.id} />)}>Edit</button>
@@ -165,46 +125,35 @@ export default function UsersPage() {
             </div>
           )}
           list={
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr><th>User</th><th>Email</th><th>Access</th><th>Role</th><th></th></tr>
-            </thead>
-            <tbody>
-              {users.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="person">
-                      <Avatar name={p.name} tone={p.tone} />
-                      {p.name}
-                      {p.id === me?.id && <span className="pill neutral">You</span>}
-                    </div>
-                  </td>
-                  <td>{p.email || <span className="subtle">No email · cannot sign in</span>}</td>
-                  <td>
-                    <select
-                      className="select"
-                      aria-label={`Access for ${p.name}`}
-                      value={p.kind}
-                      disabled={p.id === me?.id}
-                      title={p.id === me?.id ? 'You cannot change your own access' : 'Change access'}
-                      onChange={(e) => setRole(p.id, e.target.value as Kind)}
-                    >
-                      {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </td>
-                  <td>{p.title || '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn" onClick={() => openModal(<UserForm id={p.id} />)}>Edit</button>
-                      <button className="btn" aria-label={`Remove ${p.name}`} disabled={p.id === me?.id} title={p.id === me?.id ? 'You cannot remove yourself' : 'Remove'} onClick={() => del(p.id, p.name)}>×</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr><th>User</th><th>Email</th><th>Phone</th><th>Listed as</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {users.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="person">
+                          <Avatar name={p.name} />
+                          {p.name}
+                          {p.id === me?.id && <span className="pill neutral">You</span>}
+                        </div>
+                      </td>
+                      <td>{p.email || <span className="subtle">No email · cannot sign in</span>}</td>
+                      <td>{p.phone || '—'}</td>
+                      <td><span className={`pill ${p.listed === 'Not enrolled' ? 'neutral' : p.listed === 'Admin' ? 'progress' : 'active'}`}>{p.listed}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button className="btn" onClick={() => openModal(<UserForm id={p.id} />)}>Edit</button>
+                          <button className="btn" aria-label={`Remove ${p.name}`} disabled={p.id === me?.id} title={p.id === me?.id ? 'You cannot remove yourself' : 'Remove'} onClick={() => del(p.id, p.name)}>×</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           }
         />
         {view.mode === 'list' && !users.length && <Empty>No users match that search.</Empty>}
@@ -213,7 +162,7 @@ export default function UsersPage() {
       <section className="card detail-panel">
         <h3 style={{ font: '700 14px Manrope', margin: '0 0 6px' }}>Add several users at once</h3>
         <p className="subtle" style={{ lineHeight: 1.6, margin: '0 0 12px' }}>
-          One person per line as <b>Name, email</b>. Choose Admin to add multiple admins in one go.
+          One person per line as <b>Name, email</b>.
         </p>
         <form onSubmit={addMany}>
           <div className="form-grid">
@@ -226,12 +175,6 @@ export default function UsersPage() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
-            </div>
-            <div className="field">
-              <label htmlFor="b-access">Access</label>
-              <select id="b-access" value={bulkAccess} onChange={(e) => setBulkAccess(e.target.value as Kind)}>
-                {ACCESS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
             </div>
           </div>
           <div className="modal-actions"><button className="btn primary">Add users</button></div>

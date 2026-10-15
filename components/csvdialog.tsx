@@ -9,7 +9,7 @@ const DESCRIPTIONS: Record<ImportKind, string> = {
   trainers: 'Download the column template, fill in your trainer rows, then import the completed CSV.',
   curriculum: 'One row per topic, in the same layout as the training manual: Course, Planned Day, Trainer Name, Category, Training Topic, What We Cover and Practical Activity / Assessment. Repeat the course name on each row to import several courses at once. The sample file shows example rows.',
   topics: 'Download a template for this course, then import its topic rows.',
-  users: 'One row per person with Name, Email, Access (Admin, Trainer or Trainee), Role and Phone. People already listed by email are updated.',
+  users: 'One row per person with Name, Email and Phone. People already listed by email are updated. Add them to Trainees or Trainers to give them access.',
 };
 
 export function ImportDialog({ kind, courseId = '' }: { kind: ImportKind; courseId?: string }) {

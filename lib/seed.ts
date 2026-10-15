@@ -98,6 +98,7 @@ export function makeSeed(): State {
     admins: [{ id: 'ad1', name: 'Admin · Evoluz', email: 'admin@evoluz.tech', password: 'demo@123' }],
     trainers,
     trainees,
+    users: [],
     courses,
     assignments,
     progress,

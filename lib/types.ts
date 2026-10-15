@@ -28,6 +28,14 @@ export interface Admin {
   password: string;
   phone?: string;
 }
+/** A person in the user directory who is not (yet) a trainee or trainer. Access comes from the trainee/trainer lists. */
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
 export interface Trainer {
   id: string;
   name: string;
@@ -82,6 +90,8 @@ export interface State {
   admins: Admin[];
   trainers: Trainer[];
   trainees: Trainee[];
+  /** directory entries not yet enrolled as trainee or trainer */
+  users: AppUser[];
   courses: Course[];
   assignments: Assignment[];
   /** key: `${traineeId}|${courseId}|${topicId}` */

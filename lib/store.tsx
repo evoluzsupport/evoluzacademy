@@ -27,9 +27,6 @@ export interface UserDraft {
   name: string;
   email: string;
   phone: string;
-  access: Kind;
-  /** trainer's role/specialty, or a trainee's job role */
-  title: string;
 }
 
 export interface Ctx {
@@ -59,10 +56,10 @@ export interface Ctx {
   removeCourse: (id: string) => void;
   removeCourses: (ids: string[]) => void;
   removeTopic: (cid: string, topicId: string) => void;
-  setRole: (id: string, role: Kind) => boolean;
+  setRole: (id: string, role: Kind, title?: string) => boolean;
   saveUser: (id: string | null, u: UserDraft) => string | null;
   removeUser: (id: string) => void;
-  addPeople: (people: { name: string; email: string; role: Kind }[]) => { added: number; skipped: string[] };
+  addPeople: (people: { name: string; email: string }[]) => { added: number; skipped: string[] };
   importCSV: (kind: ImportKind, file: File, courseId?: string) => Promise<void>;
 }
 
@@ -416,12 +413,19 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const setRole: Ctx['setRole'] = (id, role) => {
+    // Move a person between the directory, trainee and trainer lists (one record, never duplicated).
+    const setRole: Ctx['setRole'] = (id, role, title = '') => {
       const cur = S0.current;
-      const all = [...cur.admins, ...cur.trainers, ...cur.trainees];
+      const all = [...cur.admins, ...cur.trainers, ...cur.trainees, ...cur.users];
       const who = all.find((p) => p.id === id);
       if (!who) return false;
-      const was: Kind = cur.admins.some((a) => a.id === id) ? 'admin' : cur.trainers.some((t) => t.id === id) ? 'trainer' : 'trainee';
+      const was: Kind | 'user' = cur.admins.some((a) => a.id === id)
+        ? 'admin'
+        : cur.trainers.some((t) => t.id === id)
+          ? 'trainer'
+          : cur.users.some((u) => u.id === id)
+            ? 'user'
+            : 'trainee';
       if (was === role) return true;
       if (id === myId.current) {
         toast('You cannot change your own access. Ask another admin.');
@@ -435,57 +439,48 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         s.admins = s.admins.filter((p) => p.id !== id);
         s.trainers = s.trainers.filter((p) => p.id !== id);
         s.trainees = s.trainees.filter((p) => p.id !== id);
+        s.users = s.users.filter((p) => p.id !== id);
         const base = { id, name: who.name, email: who.email, phone: who.phone, password: '' };
         const old = who as Partial<Trainer & Trainee>;
         if (role === 'admin') s.admins.push(base);
-        else if (role === 'trainer') s.trainers.push({ ...base, specialty: old.specialty ?? '', tone: old.tone ?? '' });
+        else if (role === 'trainer') s.trainers.push({ ...base, specialty: title.trim() || old.specialty || '', tone: old.tone || 'lilac' });
         else
           s.trainees.push({
             ...base,
-            jobRole: old.jobRole ?? 'Trainee',
-            joined: old.joined ?? today(),
+            jobRole: title.trim() || old.jobRole || 'Trainee',
+            joined: old.joined || today(),
             status: old.status ?? 'Active',
             trainer: old.trainer ?? '',
-            tone: old.tone ?? '',
+            tone: old.tone || 'lilac',
           });
       });
       toast(`${who.name} is now ${role === 'admin' ? 'an admin' : 'a ' + role}`);
       return true;
     };
 
-    // Create (id = null) or edit a user; returns an error message, or null on success.
+    // Create (id = null) or edit a directory entry: name, email and phone only. Access follows the
+    // trainee and trainer lists, so nothing here decides a role.
     const saveUser: Ctx['saveUser'] = (id, u) => {
       const cur = S0.current;
       const name = u.name.trim();
       const email = u.email.trim().toLowerCase();
       if (!name) return 'Please add a name';
       if (!/^\S+@\S+\.\S+$/.test(email)) return 'Please add a valid email';
-      const all = [...cur.admins, ...cur.trainers, ...cur.trainees];
+      const all = [...cur.admins, ...cur.trainers, ...cur.trainees, ...cur.users];
       if (all.some((p) => p.id !== id && p.email.toLowerCase() === email)) return 'That email is already in use';
-      const was: Kind | null = !id ? null : cur.admins.some((a) => a.id === id) ? 'admin' : cur.trainers.some((t) => t.id === id) ? 'trainer' : 'trainee';
-      if (id && id === myId.current && was && u.access !== was) return 'You cannot change your own access. Ask another admin.';
-      if (was === 'admin' && u.access !== 'admin' && cur.admins.length <= 1) return 'There must be at least one admin';
-      const prev = id ? (all.find((p) => p.id === id) as Partial<Trainer & Trainee> | undefined) : undefined;
-      const newId = id ?? uid(u.access === 'admin' ? 'ad-' : u.access === 'trainer' ? 'r-' : 't-');
+      const prev = id ? all.find((p) => p.id === id) : undefined;
+      const wasTrainer = !!id && cur.trainers.some((t) => t.id === id);
       update((s) => {
-        s.admins = s.admins.filter((p) => p.id !== newId);
-        s.trainers = s.trainers.filter((p) => p.id !== newId);
-        s.trainees = s.trainees.filter((p) => p.id !== newId);
-        const base = { id: newId, name, email, phone: u.phone.trim() || undefined, password: '' };
-        if (u.access === 'admin') s.admins.push(base);
-        else if (u.access === 'trainer')
-          s.trainers.push({ ...base, specialty: u.title.trim() || prev?.specialty || '', tone: prev?.tone ?? 'lilac' });
-        else
-          s.trainees.push({
-            ...base,
-            jobRole: u.title.trim() || prev?.jobRole || 'Trainee',
-            joined: prev?.joined ?? today(),
-            status: prev?.status ?? 'Active',
-            trainer: prev?.trainer ?? '',
-            tone: prev?.tone ?? 'lilac',
-          });
+        if (!id) {
+          s.users.push({ id: uid('u-'), name, email, phone: u.phone.trim() || undefined, password: '' });
+          return;
+        }
+        for (const list of [s.admins, s.trainers, s.trainees, s.users] as { id: string; name: string; email: string; phone?: string }[][]) {
+          const p = list.find((x) => x.id === id);
+          if (p) Object.assign(p, { name, email, phone: u.phone.trim() || undefined });
+        }
         // keep name references in step when a trainer is renamed
-        if (prev && prev.name && prev.name !== name && was === 'trainer') {
+        if (prev && prev.name && prev.name !== name && wasTrainer) {
           s.courses.forEach((c) => { if (c.primaryTrainer === prev.name) c.primaryTrainer = name; });
           s.trainees.forEach((t) => { if (t.trainer === prev.name) t.trainer = name; });
           Object.values(s.progress).forEach((r) => { if (r.trainer === prev.name) r.trainer = name; });
@@ -503,6 +498,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         s.admins = s.admins.filter((p) => p.id !== id);
         s.trainers = s.trainers.filter((p) => p.id !== id);
         s.trainees = s.trainees.filter((p) => p.id !== id);
+        s.users = s.users.filter((p) => p.id !== id);
         s.assignments = s.assignments.filter((a) => a.traineeId !== id);
         for (const k of Object.keys(s.progress)) if (k.startsWith(id + '|')) delete s.progress[k];
       });
@@ -511,7 +507,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
     const addPeople: Ctx['addPeople'] = (people) => {
       const cur = S0.current;
-      const taken = new Set([...cur.admins, ...cur.trainers, ...cur.trainees].map((p) => p.email.toLowerCase()).filter(Boolean));
+      const taken = new Set([...cur.admins, ...cur.trainers, ...cur.trainees, ...cur.users].map((p) => p.email.toLowerCase()).filter(Boolean));
       const fresh: typeof people = [];
       const skipped: string[] = [];
       for (const p of people) {
@@ -525,12 +521,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       }
       if (fresh.length)
         update((s) => {
-          for (const p of fresh) {
-            const base = { id: uid(p.role === 'admin' ? 'ad-' : p.role === 'trainer' ? 'r-' : 't-'), name: p.name, email: p.email, password: '' };
-            if (p.role === 'admin') s.admins.push(base);
-            else if (p.role === 'trainer') s.trainers.push({ ...base, specialty: '', tone: '' });
-            else s.trainees.push({ ...base, jobRole: 'Trainee', joined: today(), status: 'Active', trainer: '', tone: '' });
-          }
+          for (const p of fresh) s.users.push({ id: uid('u-'), name: p.name, email: p.email, password: '' });
         });
       return { added: fresh.length, skipped };
     };

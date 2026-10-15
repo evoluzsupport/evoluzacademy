@@ -49,6 +49,13 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
       if (!name) continue;
       const specialty = field(row, 'Role', 'Specialty');
       const email = field(row, 'Email');
+      const fromUser = email ? S.users.find((u) => lc(u.email) === lc(email)) : undefined;
+      if (fromUser) {
+        S.users = S.users.filter((u) => u.id !== fromUser.id);
+        S.trainers.push({ id: fromUser.id, name: fromUser.name || name, email: fromUser.email, phone: fromUser.phone, password: '', specialty: specialty || '', tone: 'lilac' });
+        count++;
+        continue;
+      }
       const existing = S.trainers.find((t) => lc(t.name) === lc(name));
       if (existing) {
         if (specialty !== undefined) existing.specialty = specialty;
@@ -63,6 +70,11 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
       const name = field(row, 'Name', 'Trainee');
       if (!name) continue;
       const email = field(row, 'Email');
+      const fromUser = email ? S.users.find((u) => lc(u.email) === lc(email)) : undefined;
+      if (fromUser) {
+        S.users = S.users.filter((u) => u.id !== fromUser.id);
+        S.trainees.push({ id: fromUser.id, name: fromUser.name || name, email: fromUser.email, phone: fromUser.phone, password: '', jobRole: 'Trainee', joined: today(), status: 'Active', trainer: '', tone: 'lilac' });
+      }
       const existing = S.trainees.find((t) => (email && t.email && lc(t.email) === lc(email)) || lc(t.name) === lc(name));
       const t: Trainee =
         existing ?? { id: uid('t-import-'), name, email: '', password: '', jobRole: 'Trainee', joined: today(), status: 'Active', trainer: '', tone: '' };
@@ -103,35 +115,17 @@ export function applyImport(S: State, kind: ImportKind, rows: Row[], courseId = 
         invalid++;
         continue;
       }
-      const cell = lc(field(row, 'Access', 'Role type', 'User type'));
-      const asked: Kind | undefined = cell === 'admin' || cell === 'trainer' || cell === 'trainee' ? cell : undefined;
-      const all = [...S.admins, ...S.trainers, ...S.trainees];
-      const old = all.find((p) => lc(p.email) === email) as (Partial<Trainer & Trainee> & { id: string; name: string }) | undefined;
-      const was: Kind | undefined = !old ? undefined : S.admins.some((a) => a.id === old.id) ? 'admin' : S.trainers.some((t) => t.id === old.id) ? 'trainer' : 'trainee';
-      let access: Kind = asked ?? was ?? 'trainee';
-      if (was === 'admin' && access !== 'admin' && S.admins.length <= 1) {
-        access = 'admin';
-        kept++;
-      }
+      // the directory holds name, email and phone only; access comes from the trainee and trainer lists
+      const everyone = [...S.admins, ...S.trainers, ...S.trainees, ...S.users] as { id: string; name: string; email: string; phone?: string }[];
+      const old = everyone.find((p) => lc(p.email) === email);
       const name = field(row, 'Name') || old?.name || email.split('@')[0];
-      const title = field(row, 'Role', 'Specialty', 'Job role') || '';
       const phone = field(row, 'Phone') || old?.phone;
-      const id = old?.id ?? uid(access === 'admin' ? 'ad-' : access === 'trainer' ? 'r-' : 't-');
-      S.admins = S.admins.filter((p) => p.id !== id);
-      S.trainers = S.trainers.filter((p) => p.id !== id);
-      S.trainees = S.trainees.filter((p) => p.id !== id);
-      const base = { id, name, email, phone: phone || undefined, password: '' };
-      if (access === 'admin') S.admins.push(base);
-      else if (access === 'trainer') S.trainers.push({ ...base, specialty: title || old?.specialty || '', tone: old?.tone ?? 'lilac' });
-      else
-        S.trainees.push({
-          ...base,
-          jobRole: title || old?.jobRole || 'Trainee',
-          joined: old?.joined ?? today(),
-          status: old?.status ?? 'Active',
-          trainer: old?.trainer ?? '',
-          tone: old?.tone ?? 'lilac',
-        });
+      if (old) {
+        for (const list of [S.admins, S.trainers, S.trainees, S.users] as { id: string; name: string; phone?: string }[][]) {
+          const p = list.find((x) => x.id === old.id);
+          if (p) Object.assign(p, { name, phone: phone || undefined });
+        }
+      } else S.users.push({ id: uid('u-'), name, email, phone: phone || undefined, password: '' });
       count++;
     }
     if (!count) throw new Error('No valid users found. Each row needs a valid Email column value.');
