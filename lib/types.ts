@@ -104,4 +104,6 @@ export interface Me {
   name: string;
   email: string;
   phone?: string;
+  /** signed in but not yet made a trainee, trainer or admin: sees only the "request sent" screen */
+  pending?: boolean;
 }

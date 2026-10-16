@@ -33,6 +33,9 @@ export interface Ctx {
   ready: boolean;
   S: State;
   me: Me | null;
+  /** one-time congratulations shown when a pending person is given access */
+  congrats: string;
+  clearCongrats: () => void;
   /** why the last sign-in was refused (e.g. not authorized); shown on the login screen */
   authError: string;
   clearAuthError: () => void;
@@ -119,7 +122,7 @@ function keepAsUser(s: State, ids: string[]) {
   s.trainers = s.trainers.filter((t) => !gone.has(t.id));
 }
 
-const NOT_AUTHORIZED = 'You are not authorized to access Evoluz Academy. Please contact your administrator.';
+const NOT_AUTHORIZED = 'We could not set up your account. Please contact Evoluz Academy.';
 
 export function PortalProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -127,6 +130,19 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const [remoteMe, setRemoteMe] = useState<Me | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [authError, setAuthError] = useState('');
+  const [congrats, setCongrats] = useState('');
+
+  // Remember that this person was waiting for access; when an admin later gives them access, say congratulations once.
+  const noteAccess = useCallback((id: string, pending: boolean) => {
+    try {
+      const k = `evoluzPending:${id}`;
+      if (pending) localStorage.setItem(k, '1');
+      else if (localStorage.getItem(k)) {
+        localStorage.removeItem(k);
+        setCongrats('Congratulations! You now have access to Evoluz Academy. Welcome aboard.');
+      }
+    } catch {}
+  }, []);
   const [toastMsg, setToastMsg] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // latest state, updated synchronously so back-to-back updates compose
@@ -157,23 +173,24 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      adopt(await loadRemote());
       // an admin may have changed this person's access: pick up the new role
       const uid = bootedFor.current;
       const p = uid ? await myProfile(uid) : null;
+      if (!p?.pending) adopt(await loadRemote());
       if (uid && !p) {
-        // access was removed while this person was signed in
         bootedFor.current = null;
         setAuthError(NOT_AUTHORIZED);
         await supabase.auth.signOut({ scope: 'local' });
         return;
       }
-      if (p)
+      if (p) {
+        noteAccess(p.id, p.pending);
         setRemoteMe((cur) =>
-          cur && cur.kind === p.role && cur.name === p.name
+          cur && cur.kind === p.role && cur.name === p.name && !!cur.pending === p.pending
             ? cur
-            : { kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined }
+            : { kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined, pending: p.pending }
         );
+      }
     } catch {}
   }, [adopt]);
 
@@ -198,8 +215,9 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           await supabase.auth.signOut({ scope: 'local' });
           return;
         }
-        adopt(await loadRemote());
-        setRemoteMe({ kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined });
+        if (!p.pending) adopt(await loadRemote());
+        noteAccess(p.id, p.pending);
+        setRemoteMe({ kind: p.role as Kind, id: p.id, name: p.name, email: p.email ?? '', phone: p.phone ?? undefined, pending: p.pending });
       } catch (e) {
         bootedFor.current = null;
         toast(e instanceof Error ? e.message : 'Could not load data');
@@ -559,6 +577,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     login,
     loginWithZoho,
     authError,
+    congrats,
+    clearCongrats: () => setCongrats(''),
     clearAuthError: () => setAuthError(''),
     logout,
     update,

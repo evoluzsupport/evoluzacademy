@@ -310,8 +310,8 @@ export async function loadRemote(): Promise<State> {
 }
 
 /**
- * The signed-in person's profile, or null when they have no access: never added, deleted by an admin,
- * or only a directory entry (a trainee row with no joined date and no job role).
+ * The signed-in person's profile. `pending` is true for a directory entry (a trainee row with no joined
+ * date and no job role): someone who asked for access and has not been made a trainee or trainer yet.
  */
 export async function myProfile(authUserId: string) {
   const { data } = await supabase
@@ -322,16 +322,13 @@ export async function myProfile(authUserId: string) {
   type Prof = { id: string; name: string; email: string | null; phone: string | null; role: string; joined: string | null; job_role: string | null };
   let p = data as Prof | null;
   if (!p) {
-    // not linked yet: link by email (the database no longer creates profiles for strangers)
+    // not linked yet: link by email, or the database records an access request for a new sign-in
     const made = await supabase.rpc('ensure_profile');
-    if (made.error) {
-      if (/not authorized/i.test(made.error.message)) return null;
-      throw new Error(made.error.message);
-    }
+    if (made.error) throw new Error(made.error.message);
     const r = made.data as Prof | null;
     p = r && r.id ? r : null;
   }
   if (!p) return null;
-  if (p.role === 'trainee' && !p.joined && !p.job_role) return null;
-  return { id: p.id, name: p.name, email: p.email, phone: p.phone, role: p.role };
+  const pending = p.role === 'trainee' && !p.joined && !p.job_role;
+  return { id: p.id, name: p.name, email: p.email, phone: p.phone, role: p.role, pending };
 }

@@ -211,7 +211,7 @@ function ProfileMenu({ tone }: { tone: string }) {
 }
 
 export default function Frame({ children }: { children: ReactNode }) {
-  const { ready, me, S, logout, toast } = usePortal();
+  const { ready, me, S, logout, toast, congrats, clearCongrats } = usePortal();
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -233,6 +233,23 @@ export default function Frame({ children }: { children: ReactNode }) {
 
   if (isPublic) return <>{children}</>;
   if (!ready || !me) return null;
+
+  // signed in but not added yet: their request is with the admins, nothing else is shown
+  if (me.pending)
+    return (
+      <div className="login-wrap">
+        <div className="login-box" style={{ textAlign: 'center' }}>
+          <Image src="/evoluz-logo.png" alt="Evoluz" width={190} height={51} priority style={{ width: 190, height: 'auto', margin: '0 auto 6px' }} />
+          <h1>Your request has been sent</h1>
+          <p className="lead">
+            Hi {me.name.split(' ')[0]}, your request for access to Evoluz Academy has been sent. The Evoluz Academy team will review it and reach out to you. Once you are added you will get a
+            welcome email and can sign in to start learning.
+          </p>
+          <p className="lead" style={{ fontSize: 12 }}>Signed in as {me.email}</p>
+          <button className="btn primary login-btn" onClick={() => { logout(); router.replace('/login'); }}>Sign out</button>
+        </div>
+      </div>
+    );
 
   const nav = NAV[me.kind];
   const active = (href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
@@ -315,7 +332,15 @@ export default function Frame({ children }: { children: ReactNode }) {
             <ProfileMenu tone={mine ?? ''} />
           </div>
         </header>
-        <div className="content">{children}</div>
+        <div className="content">
+          {congrats && (
+            <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#eaf7f1', border: '1px solid #bfe6d6', color: '#14684f', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 14, fontWeight: 600 }}>
+              <span>🎉 {congrats}</span>
+              <button className="btn" onClick={clearCongrats}>Dismiss</button>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );
