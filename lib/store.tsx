@@ -2,6 +2,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Kind, Me, State, Trainee, Trainer } from './types';
+import { removedEmail } from './emails';
+import { sendAccessRequestMail, sendAll } from './mailer';
 import { emptyState, loadRemote, myProfile, pushDiff } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
@@ -136,7 +138,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const noteAccess = useCallback((id: string, pending: boolean) => {
     try {
       const k = `evoluzPending:${id}`;
-      if (pending) localStorage.setItem(k, '1');
+      if (pending) {
+        if (!localStorage.getItem(k)) {
+          localStorage.setItem(k, '1');
+          void sendAccessRequestMail();
+        }
+      }
       else if (localStorage.getItem(k)) {
         localStorage.removeItem(k);
         setCongrats('Congratulations! You now have access to Evoluz Academy. Welcome aboard.');
@@ -380,7 +387,20 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       toast('Session undone · its marks were removed');
     };
 
+    // tell removed trainees and trainers by email (the admin's session sends it)
+    const mailRemoved = (ids: string[]) => {
+      const cur = S0.current;
+      const mails = ids.flatMap((id) => {
+        const t = cur.trainees.find((x) => x.id === id);
+        const r = cur.trainers.find((x) => x.id === id);
+        const who = t ?? r;
+        return who && who.email ? [removedEmail({ origin: window.location.origin, name: who.name, email: who.email, role: t ? 'Trainee' : 'Trainer' })] : [];
+      });
+      if (mails.length) void sendAll(mails, toast, 'Removal notice');
+    };
+
     const removeTrainee: Ctx['removeTrainee'] = (id) => {
+      mailRemoved([id]);
       update((s) => {
         keepAsUser(s, [id]);
         s.assignments = s.assignments.filter((a) => a.traineeId !== id);
@@ -390,6 +410,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     };
 
     const removeTrainees: Ctx['removeTrainees'] = (ids) => {
+      mailRemoved(ids);
       const gone = new Set(ids);
       update((s) => {
         keepAsUser(s, ids);
@@ -400,6 +421,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     };
 
     const removeTrainers: Ctx['removeTrainers'] = (ids) => {
+      mailRemoved(ids);
       const gone = new Set(ids);
       update((s) => {
         keepAsUser(s, ids);

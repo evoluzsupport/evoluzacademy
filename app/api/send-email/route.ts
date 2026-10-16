@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { requestReceivedEmail } from '@/lib/emails';
 
 export const runtime = 'nodejs';
 
@@ -18,9 +19,13 @@ export async function POST(req: Request) {
   });
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return NextResponse.json({ error: 'Sign in first' }, { status: 401 });
-  const { data: prof } = await sb.from('profiles').select('role').eq('auth_user_id', u.user.id).maybeSingle();
-  if (!prof || (prof.role !== 'admin' && prof.role !== 'trainer'))
-    return NextResponse.json({ error: 'Only admins and trainers can send email' }, { status: 403 });
+  const { data: prof } = await sb.from('profiles').select('role,name,email,joined,job_role').eq('auth_user_id', u.user.id).maybeSingle();
+  const body = (await req.json()) as { kind?: string; to?: string; subject?: string; html?: string; text?: string };
+  const staff = !!prof && (prof.role === 'admin' || prof.role === 'trainer');
+
+  // A person who signed in without being added may send exactly one fixed email: the thank-you to themselves.
+  const asking = body.kind === 'access-request' && !!prof && !staff && !prof.joined && !prof.job_role;
+  if (!staff && !asking) return NextResponse.json({ error: 'Only admins and trainers can send email' }, { status: 403 });
 
   const smtpHost = process.env.SMTP_HOST;
   const smtpUser = process.env.SMTP_USER;
@@ -30,7 +35,11 @@ export async function POST(req: Request) {
   const useSmtp = !!(smtpHost && smtpUser && smtpPass);
   if (!from || (!useSmtp && !key)) return NextResponse.json({ error: 'not-configured' }, { status: 501 });
 
-  const { to, subject, html, text } = (await req.json()) as { to?: string; subject?: string; html?: string; text?: string };
+  let to: string | undefined, subject: string | undefined, html: string | undefined, text: string | undefined;
+  if (asking) {
+    const mail = requestReceivedEmail({ origin: new URL(req.url).origin, name: prof!.name, email: u.user.email || prof!.email || '' });
+    ({ to, subject, html, text } = mail);
+  } else ({ to, subject, html, text } = body);
   if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to) || !subject || !html)
     return NextResponse.json({ error: 'Missing recipient, subject or body' }, { status: 400 });
 

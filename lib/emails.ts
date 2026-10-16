@@ -122,3 +122,52 @@ export function courseAssignedTrainer(p: AssignInfo & { toName: string; toEmail:
   const text = `Hi ${first},\n\nYou will deliver the course "${p.course}".\nTrainee: ${p.trainee}\nTopics: ${p.topics}\nStart: ${fmt(p.start)}\nDue: ${fmt(p.due)}\n\nOpen the portal: ${link}\n\nRegards,\nEvoluz Academy`;
   return { to: p.toEmail, toName: p.toName, subject: `Training assigned to you: ${p.course} for ${p.trainee}`, html, text };
 }
+
+const CONTACT = 'mailto:academy@evoluz.ai';
+
+/** Sent to a trainee or trainer when an admin removes them. */
+export function removedEmail(p: { origin: string; name: string; email: string; role: string }): Email {
+  const first = p.name.split(' ')[0];
+  const html = shell({
+    origin: p.origin,
+    accent: '#c0453a',
+    tag: 'Access update',
+    title: `Your ${esc(p.role.toLowerCase())} access has been removed`,
+    intro: `Hi ${esc(first)}, your ${esc(p.role.toLowerCase())} access to Evoluz Academy has been removed by an administrator. You will no longer see courses or training records in the portal.`,
+    body: `<p style="margin:0;font-size:13px;line-height:1.65;color:#41506a">If you think this was a mistake or you have questions, please get in touch with the Evoluz Academy team and we will help you.</p>`,
+    cta: 'Contact Evoluz Academy',
+    link: CONTACT,
+    foot: 'You received this because your access to Evoluz Academy was changed.',
+  });
+  const text = `Hi ${first},
+
+Your ${p.role.toLowerCase()} access to Evoluz Academy has been removed by an administrator.
+If you think this is a mistake, contact academy@evoluz.ai.
+
+Regards,
+Evoluz Academy`;
+  return { to: p.email, toName: p.name, subject: 'Your Evoluz Academy access has been removed', html, text };
+}
+
+/** Sent to someone who signs in without being added: their access request was received. */
+export function requestReceivedEmail(p: { origin: string; name: string; email: string }): Email {
+  const first = p.name.split(' ')[0];
+  const html = shell({
+    origin: p.origin,
+    accent: '#3158b6',
+    tag: 'Request received',
+    title: 'Thank you for connecting with Evoluz Academy',
+    intro: `Hi ${esc(first)}, thank you for connecting with Evoluz Academy. We have received your request for access and will reach out to you as soon as possible.`,
+    body: `<p style="margin:0;font-size:13px;line-height:1.65;color:#41506a">Once you are added you will get a welcome email and can sign in to start learning. If you need us sooner, just reply to this email.</p>`,
+    cta: 'Contact Evoluz Academy',
+    link: CONTACT,
+    foot: 'You received this because you signed in to Evoluz Academy and asked for access.',
+  });
+  const text = `Hi ${first},
+
+Thank you for connecting with Evoluz Academy. We have received your request and will reach out to you as soon as possible.
+
+Regards,
+Evoluz Academy`;
+  return { to: p.email, toName: p.name, subject: 'Thank you for connecting with Evoluz Academy', html, text };
+}

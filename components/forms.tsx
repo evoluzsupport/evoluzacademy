@@ -7,7 +7,8 @@ import { isAssigned, learners, nameMatches, plannedDays, topicTrainer, trainerNa
 import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
 import { FormActions } from './ui';
-import { assignmentEmails, sendAll } from './EmailDialog';
+import { assignmentEmails } from './EmailDialog';
+import { sendAll } from '@/lib/mailer';
 import { EMAIL_ENABLED, welcomeEmail } from '@/lib/emails';
 
 const emailTaken = (S: State, email: string, id?: string) =>
