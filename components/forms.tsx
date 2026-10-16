@@ -160,7 +160,7 @@ export function TrainerForm({ id }: { id?: string }) {
         });
       closeModal();
       if (chosen.kind !== 'user') toast(`${chosen.name} is now a trainer`);
-      else if (EMAIL_ENABLED) void sendAll([welcomeEmail({ origin: window.location.origin, name: chosen.name, email: chosen.email, role: role || 'Trainer' })], toast, 'Welcome');
+      if (EMAIL_ENABLED) void sendAll([welcomeEmail({ origin: window.location.origin, name: chosen.name, email: chosen.email, role: role || 'Trainer' })], toast, 'Welcome');
       return;
     }
     const name = f.name.trim();
