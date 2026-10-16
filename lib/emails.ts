@@ -1,6 +1,10 @@
 /** HTML email templates in the portal's look (navy/blue, rounded cards). Inline styles and tables so mail apps render them. */
-/** Email buttons and the post-assignment email dialog are hidden while this is false. */
-export const EMAIL_ENABLED = false;
+/**
+ * Master switch for email. When true: the welcome email goes out when someone is made a trainee or trainer,
+ * the "course assigned" emails go to the trainee and trainer when a course is assigned, and the manual
+ * Email buttons (resend) show. Mail is sent from the SMTP sender set in the server environment.
+ */
+export const EMAIL_ENABLED = true;
 
 export interface Email {
   to: string;

@@ -7,8 +7,8 @@ import { isAssigned, learners, nameMatches, plannedDays, topicTrainer, trainerNa
 import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
 import { FormActions } from './ui';
-import { EmailDialog, assignmentEmails } from './EmailDialog';
-import { EMAIL_ENABLED } from '@/lib/emails';
+import { assignmentEmails, sendAll } from './EmailDialog';
+import { EMAIL_ENABLED, welcomeEmail } from '@/lib/emails';
 
 const emailTaken = (S: State, email: string, id?: string) =>
   !!email &&
@@ -55,7 +55,10 @@ export function TraineeForm({ id }: { id?: string }) {
       if (!chosen) return toast('Pick a person from the list');
       if (chosen.kind === 'user') {
         // the directory entry becomes the trainee: same record, now enrolled
-        if (setRole(chosen.id, 'trainee', f.jobRole)) closeModal();
+        if (setRole(chosen.id, 'trainee', f.jobRole)) {
+          closeModal();
+          if (EMAIL_ENABLED) void sendAll([welcomeEmail({ origin: window.location.origin, name: chosen.name, email: chosen.email, role: f.jobRole || 'Trainee' })], toast, 'Welcome');
+        }
         return;
       }
       // a trainer or admin keeps their one record and joins the trainee list once a course is assigned
@@ -157,6 +160,7 @@ export function TrainerForm({ id }: { id?: string }) {
         });
       closeModal();
       if (chosen.kind !== 'user') toast(`${chosen.name} is now a trainer`);
+      else if (EMAIL_ENABLED) void sendAll([welcomeEmail({ origin: window.location.origin, name: chosen.name, email: chosen.email, role: role || 'Trainer' })], toast, 'Welcome');
       return;
     }
     const name = f.name.trim();
@@ -365,11 +369,13 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     if (start && due && due < start) return toast('Due date cannot be before the start date');
     if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer, start)) return toast('This trainee already has that course');
     toast('Course assigned');
-    if (!EMAIL_ENABLED) closeModal();
-    // offer the "course assigned" emails for the trainee and the trainer
-    const made = { id: 'new', traineeId: tid, courseId: cid, assignedOn: today(), startDate: start, due, trainer };
-    const emails = EMAIL_ENABLED ? assignmentEmails(S, made, me?.name) : [];
-    if (EMAIL_ENABLED && emails.length) openModal(<EmailDialog title="Course assigned: send emails" emails={emails} />, true);
+    closeModal();
+    // send the "course assigned" emails to the trainee and the trainer automatically
+    if (EMAIL_ENABLED) {
+      const made = { id: 'new', traineeId: tid, courseId: cid, assignedOn: today(), startDate: start, due, trainer };
+      const emails = assignmentEmails(S, made, me?.name).map((x) => x.email);
+      if (emails.length) void sendAll(emails, toast, 'Course assigned');
+    }
   };
   return (
     <>
