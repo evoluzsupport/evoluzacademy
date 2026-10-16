@@ -309,17 +309,29 @@ export async function loadRemote(): Promise<State> {
   return s;
 }
 
-/** The signed-in person's directory row, or null if their email was never added. */
+/**
+ * The signed-in person's profile, or null when they have no access: never added, deleted by an admin,
+ * or only a directory entry (a trainee row with no joined date and no job role).
+ */
 export async function myProfile(authUserId: string) {
   const { data } = await supabase
     .from('profiles')
-    .select('id,name,email,phone,role')
+    .select('id,name,email,phone,role,joined,job_role')
     .eq('auth_user_id', authUserId)
     .maybeSingle();
-  if (data) return data;
-  // not linked yet: link by email, or create a trainee for a new company email
-  const made = await supabase.rpc('ensure_profile');
-  if (made.error) throw new Error(made.error.message);
-  const p = made.data as { id: string; name: string; email: string | null; phone: string | null; role: string };
-  return p ? { id: p.id, name: p.name, email: p.email, phone: p.phone, role: p.role } : null;
+  type Prof = { id: string; name: string; email: string | null; phone: string | null; role: string; joined: string | null; job_role: string | null };
+  let p = data as Prof | null;
+  if (!p) {
+    // not linked yet: link by email (the database no longer creates profiles for strangers)
+    const made = await supabase.rpc('ensure_profile');
+    if (made.error) {
+      if (/not authorized/i.test(made.error.message)) return null;
+      throw new Error(made.error.message);
+    }
+    const r = made.data as Prof | null;
+    p = r && r.id ? r : null;
+  }
+  if (!p) return null;
+  if (p.role === 'trainee' && !p.joined && !p.job_role) return null;
+  return { id: p.id, name: p.name, email: p.email, phone: p.phone, role: p.role };
 }

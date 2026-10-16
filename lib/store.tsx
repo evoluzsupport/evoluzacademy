@@ -33,6 +33,9 @@ export interface Ctx {
   ready: boolean;
   S: State;
   me: Me | null;
+  /** why the last sign-in was refused (e.g. not authorized); shown on the login screen */
+  authError: string;
+  clearAuthError: () => void;
   login: (email: string, password: string) => Promise<boolean>;
   loginWithZoho: () => Promise<string | null>;
   logout: () => void;
@@ -107,11 +110,23 @@ function findMe(S: State, kind: Kind, id: string): Me | null {
   return x ? { kind, id: x.id, name: x.name, email: x.email, phone: x.phone } : null;
 }
 
+/** Takes people off the trainee and trainer lists but keeps them in the user directory (name, email, phone). */
+function keepAsUser(s: State, ids: string[]) {
+  const gone = new Set(ids);
+  for (const p of [...s.trainees, ...s.trainers].filter((x) => gone.has(x.id)))
+    if (!s.users.some((u) => u.id === p.id)) s.users.push({ id: p.id, name: p.name, email: p.email, phone: p.phone, password: '' });
+  s.trainees = s.trainees.filter((t) => !gone.has(t.id));
+  s.trainers = s.trainers.filter((t) => !gone.has(t.id));
+}
+
+const NOT_AUTHORIZED = 'You are not authorized to access Evoluz Academy. Please contact your administrator.';
+
 export function PortalProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [S, setS] = useState<State>(() => emptyState());
   const [remoteMe, setRemoteMe] = useState<Me | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [authError, setAuthError] = useState('');
   const [toastMsg, setToastMsg] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // latest state, updated synchronously so back-to-back updates compose
@@ -146,6 +161,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       // an admin may have changed this person's access: pick up the new role
       const uid = bootedFor.current;
       const p = uid ? await myProfile(uid) : null;
+      if (uid && !p) {
+        // access was removed while this person was signed in
+        bootedFor.current = null;
+        setAuthError(NOT_AUTHORIZED);
+        await supabase.auth.signOut({ scope: 'local' });
+        return;
+      }
       if (p)
         setRemoteMe((cur) =>
           cur && cur.kind === p.role && cur.name === p.name
@@ -172,7 +194,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }
         if (!p) {
           bootedFor.current = null;
-          toast('Your account is not set up yet. Ask an admin to add your email.');
+          setAuthError(NOT_AUTHORIZED);
           await supabase.auth.signOut({ scope: 'local' });
           return;
         }
@@ -342,17 +364,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
 
     const removeTrainee: Ctx['removeTrainee'] = (id) => {
       update((s) => {
-        s.trainees = s.trainees.filter((t) => t.id !== id);
+        keepAsUser(s, [id]);
         s.assignments = s.assignments.filter((a) => a.traineeId !== id);
         for (const k of Object.keys(s.progress)) if (k.startsWith(id + '|')) delete s.progress[k];
       });
-      toast('Trainee removed');
+      toast('Trainee removed. They stay in the user list.');
     };
 
     const removeTrainees: Ctx['removeTrainees'] = (ids) => {
       const gone = new Set(ids);
       update((s) => {
-        s.trainees = s.trainees.filter((t) => !gone.has(t.id));
+        keepAsUser(s, ids);
         s.assignments = s.assignments.filter((a) => !gone.has(a.traineeId));
         for (const k of Object.keys(s.progress)) if (gone.has(k.split('|')[0])) delete s.progress[k];
       });
@@ -362,9 +384,9 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const removeTrainers: Ctx['removeTrainers'] = (ids) => {
       const gone = new Set(ids);
       update((s) => {
-        s.trainers = s.trainers.filter((t) => !gone.has(t.id));
+        keepAsUser(s, ids);
       });
-      toast(`${ids.length} ${ids.length === 1 ? 'trainer' : 'trainers'} removed`);
+      toast(`${ids.length} ${ids.length === 1 ? 'trainer' : 'trainers'} removed. They stay in the user list.`);
     };
 
     const removeCourse: Ctx['removeCourse'] = (id) => {
@@ -536,6 +558,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     me,
     login,
     loginWithZoho,
+    authError,
+    clearAuthError: () => setAuthError(''),
     logout,
     update,
     toast,

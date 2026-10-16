@@ -7,7 +7,7 @@ import { usePortal } from '@/lib/store';
 import './login-bg.css';
 
 export default function LoginPage() {
-  const { login, loginWithZoho, ready, me } = usePortal();
+  const { login, loginWithZoho, ready, me, authError, clearAuthError } = usePortal();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -35,6 +35,7 @@ export default function LoginPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setErr('');
+    clearAuthError();
     if (await login(email, pw)) router.replace('/');
     else setErr('Invalid email or password.');
   };
@@ -57,7 +58,7 @@ export default function LoginPage() {
             <label htmlFor="pw">Password</label>
             <input id="pw" type="password" required autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
           </div>
-          <p className="login-err" role="alert">{err}</p>
+          <p className="login-err" role="alert">{err || authError}</p>
           <div className="login-actions">
             <button className="btn primary login-btn">Sign in</button>
             <span className="login-or">or</span>
