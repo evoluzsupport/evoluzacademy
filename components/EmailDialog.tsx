@@ -50,12 +50,11 @@ export async function sendAll(emails: Email[], toast: (m: string) => void, what:
   toast(failed ? `${what}: ${ok} sent. ${failed}` : `${what}: ${ok} email${ok === 1 ? '' : 's'} sent`);
 }
 
-/** Preview one or more emails in the portal's design and send them (or hand off to the mail app). */
+/** Preview one or more emails in the portal's design and send them. */
 export function EmailDialog({ emails, title = 'Send email' }: { emails: { label: string; email: Email }[]; title?: string }) {
   const { closeModal, toast } = usePortal();
   const [i, setI] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState<Set<number>>(new Set());
   const cur = emails[i];
   const e = cur.email;
 
@@ -70,27 +69,16 @@ export function EmailDialog({ emails, title = 'Send email' }: { emails: { label:
         body: JSON.stringify({ to: e.to, subject: e.subject, html: e.html, text: e.text }),
       });
       if (r.ok) {
-        setSent((p) => new Set(p).add(i));
         toast(`Email sent to ${e.toName}`);
+        closeModal();
       } else if (r.status === 501) {
-        toast('Email sending is not set up on the server yet. Use "Open in mail app" or "Copy HTML".');
+        toast('Email sending is not set up on the server yet');
       } else {
         const j = await r.json().catch(() => ({}));
         toast(j.error || 'Could not send the email');
       }
     } finally {
       setBusy(false);
-    }
-  };
-  const mail = () => {
-    window.location.href = `mailto:${encodeURIComponent(e.to)}?subject=${encodeURIComponent(e.subject)}&body=${encodeURIComponent(e.text)}`;
-  };
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(e.html);
-      toast('Email HTML copied');
-    } catch {
-      toast('Could not copy');
     }
   };
 
@@ -102,7 +90,7 @@ export function EmailDialog({ emails, title = 'Send email' }: { emails: { label:
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           {emails.map((x, n) => (
             <button key={n} className={`btn ${n === i ? 'primary' : ''}`} onClick={() => setI(n)}>
-              {x.label}{sent.has(n) ? ' ✓' : ''}
+              {x.label}
             </button>
           ))}
         </div>
@@ -119,9 +107,7 @@ export function EmailDialog({ emails, title = 'Send email' }: { emails: { label:
       />
       <div className="modal-actions">
         <button className="btn" onClick={closeModal}>Close</button>
-        <button className="btn" onClick={copy}>Copy HTML</button>
-        <button className="btn" onClick={mail} disabled={!e.to}>Open in mail app</button>
-        <button className="btn primary" onClick={send} disabled={busy || !e.to}>{busy ? 'Sending…' : sent.has(i) ? 'Send again' : 'Send email'}</button>
+        <button className="btn primary" onClick={send} disabled={busy || !e.to}>{busy ? 'Sending…' : 'Send email'}</button>
       </div>
     </>
   );

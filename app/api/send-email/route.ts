@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   });
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return NextResponse.json({ error: 'Sign in first' }, { status: 401 });
-  const { data: prof } = await sb.from('profiles').select('role').eq('id', u.user.id).maybeSingle();
+  const { data: prof } = await sb.from('profiles').select('role').eq('auth_user_id', u.user.id).maybeSingle();
   if (!prof || (prof.role !== 'admin' && prof.role !== 'trainer'))
     return NextResponse.json({ error: 'Only admins and trainers can send email' }, { status: 403 });
 
