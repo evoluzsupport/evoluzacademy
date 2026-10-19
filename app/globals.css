@@ -159,3 +159,8 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .tabs button:hover{color:var(--navy)}
 .tabs button.on{color:#2c54ae;border-bottom-color:#3158b6}
 .tabs .count{margin-left:7px;background:#eef3fe;color:#3158b6;border-radius:20px;padding:2px 8px;font-size:10px}
+
+/* sidebar scrolls when its content is taller than the screen */
+.sidebar{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.sidebar .side-bottom{flex-shrink:0}
+.sidebar .brand,.sidebar .nav-label,.sidebar .nav{flex-shrink:0}
