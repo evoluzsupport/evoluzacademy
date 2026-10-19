@@ -231,8 +231,9 @@ function TrainerPicker({ names, value, onChange }: { names: string[]; value: str
   return (
     <div className="trainer-picker" role="group" aria-label="Trainers" style={{ display: 'grid', gap: 6, maxHeight: 180, overflow: 'auto', padding: '8px 10px', border: '1px solid var(--line, #ddd)', borderRadius: 10 }}>
       {all.map((n) => (
-        <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <input type="checkbox" checked={value.includes(n)} onChange={() => toggle(n)} /> {n}
+        <label key={n} style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600 }}>
+          <input type="checkbox" checked={value.includes(n)} onChange={() => toggle(n)} style={{ width: 16, height: 16, padding: 0, margin: 0, flex: 'none' }} />
+          <span>{n}</span>
         </label>
       ))}
     </div>
