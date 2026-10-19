@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { usePortal } from '@/lib/store';
 import { firstTrainer } from '@/lib/seed';
-import { nameMatches, topicKey, trainerNames } from '@/lib/selectors';
+import { canEditCompletion, nameMatches, topicKey, trainerNames } from '@/lib/selectors';
 import type { Course, Topic } from '@/lib/types';
 import { fmtDate, today } from '@/lib/util';
 
@@ -37,10 +37,13 @@ export function TopicDetails({ cover, activity }: { cover?: string; activity?: s
 }
 
 /** One topic with its per-learner completion state; editable for trainers/admins. */
-export function TopicRow({ traineeId, course, topic, editable }: { traineeId: string; course: Course; topic: Topic; editable: boolean }) {
+export function TopicRow({ traineeId, course, topic, editable: allowed }: { traineeId: string; course: Course; topic: Topic; editable: boolean }) {
   const { S, me, toggleTopic, patchCompletion } = usePortal();
   const rec = S.progress[topicKey(traineeId, course.id, topic.id)];
   const done = !!rec?.done;
+  // a completed topic can only be changed by the trainer who delivered it (or an admin)
+  const editable = allowed && canEditCompletion(me, rec);
+  const locked = allowed && done && !editable;
   // default "delivered by": the signed-in person when they are one of the course's trainers, else its first trainer
   const [draftTrainer, setDraftTrainer] = useState(me && nameMatches(course.primaryTrainer, me.name) ? me.name : firstTrainer(course));
   const [draftDate, setDraftDate] = useState(today());
@@ -55,7 +58,7 @@ export function TopicRow({ traineeId, course, topic, editable }: { traineeId: st
         role="checkbox"
         aria-checked={done}
         aria-label={`${topic.topic}: ${done ? 'completed' : 'not completed'}`}
-        title={editable ? (done ? 'Mark incomplete' : 'Mark complete') : done ? 'Completed' : 'Not completed yet'}
+        title={editable ? (done ? 'Mark incomplete' : 'Mark complete') : locked ? `Delivered by ${rec?.trainer}. Only they or an admin can change it` : done ? 'Completed' : 'Not completed yet'}
         disabled={!editable}
         style={editable ? undefined : { cursor: 'default' }}
         onClick={() => toggleTopic(traineeId, course.id, topic.id, trainer, date)}
@@ -103,6 +106,7 @@ export function TopicRow({ traineeId, course, topic, editable }: { traineeId: st
             )
           )}
           {done && <span className="pill done">Completed</span>}
+          {locked && <span className="subtle">Locked · only {rec?.trainer} or an admin can change it</span>}
         </div>
       </div>
       <span className="topic-day">{topic.day}</span>

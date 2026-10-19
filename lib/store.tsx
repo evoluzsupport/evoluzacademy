@@ -8,7 +8,7 @@ import { emptyState, loadRemote, myProfile, pushDiff } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
-import { isAssigned, topicKey } from './selectors';
+import { canEditCompletion, isAssigned, nameMatches, topicKey } from './selectors';
 import { renameTrainer } from './seed';
 import { supabase } from './supabase';
 
@@ -24,6 +24,8 @@ export interface SessionDraft {
   traineeIds: string[];
   topicIds: string[];
   updateExisting: boolean;
+  /** who is saving it: other people's completed topics are never overwritten unless they are an admin */
+  by?: { name: string; admin: boolean };
 }
 
 export interface UserDraft {
@@ -89,7 +91,8 @@ function applySession(s: State, d: SessionDraft): string | null {
   for (const topicId of d.topicIds)
     for (const tid of attendees) {
       const key = topicKey(tid, c.id, topicId);
-      if (s.progress[key]?.done && !d.updateExisting) {
+      const cur = s.progress[key];
+      if (cur?.done && (!d.updateExisting || (d.by && !d.by.admin && !nameMatches(cur.trainer, d.by.name)))) {
         kept++;
         continue;
       }
@@ -265,6 +268,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     [S, remoteMe]
   );
   myId.current = remoteMe?.id ?? null;
+  const meRef = useRef(me);
+  meRef.current = me;
 
   const update = useCallback(
     (fn: (s: State) => void) => {
@@ -336,7 +341,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const actions = useMemo(() => {
     const toggleTopic: Ctx['toggleTopic'] = (tid, cid, topicId, trainer, date) => {
       const key = topicKey(tid, cid, topicId);
-      if (!S0.current.progress[key]?.done && !validPastOrToday(date)) {
+      const rec0 = S0.current.progress[key];
+      if (rec0?.done && !canEditCompletion(meRef.current, rec0)) {
+        toast(`Only ${rec0.trainer} (or an admin) can change this topic`);
+        return;
+      }
+      if (!rec0?.done && !validPastOrToday(date)) {
         toast('Choose today or an earlier date');
         return;
       }
@@ -347,6 +357,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     };
 
     const patchCompletion: Ctx['patchCompletion'] = (tid, cid, topicId, patch) => {
+      const rec0 = S0.current.progress[topicKey(tid, cid, topicId)];
+      if (rec0?.done && !canEditCompletion(meRef.current, rec0)) {
+        toast(`Only ${rec0.trainer} (or an admin) can change this topic`);
+        return;
+      }
       if (patch.date !== undefined && !validPastOrToday(patch.date)) {
         toast('Future dates are not allowed');
         return;

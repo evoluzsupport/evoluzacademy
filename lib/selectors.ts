@@ -11,6 +11,16 @@ export const nameMatches = (value: string | undefined, name: string | undefined)
     .some((x) => x.toLowerCase().replace(/\s+/g, ' ').trim() === n);
 };
 
+/**
+ * A completed topic belongs to the trainer who delivered it. Only that trainer (or an admin) may untick it
+ * or change its date or trainer; other trainers on the course can see it but not edit it.
+ */
+export const canEditCompletion = (me: Me | null, rec?: { done: boolean; trainer: string }) => {
+  if (!me || me.kind === 'trainee') return false;
+  if (!rec?.done || me.kind === 'admin') return true;
+  return nameMatches(rec.trainer, me.name);
+};
+
 export const topicKey = (tid: string, cid: string, topicId: string) => `${tid}|${cid}|${topicId}`;
 
 export const courseById = (S: State, id: string) => S.courses.find((c) => c.id === id);

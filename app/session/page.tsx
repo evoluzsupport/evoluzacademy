@@ -96,7 +96,7 @@ export default function SessionPage() {
     const attendees = traineeIds;
     if (!attendees.length || !topicIds.length) return toast('Choose a course, at least one attendee, and a topic');
     if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
-    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds, updateExisting });
+    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds, updateExisting, by: me ? { name: me.name, admin: me.kind === 'admin' } : undefined });
     if (msg) {
       toast(msg);
       router.push('/sessions');
@@ -190,7 +190,7 @@ export default function SessionPage() {
           </div>
           <label className="choice" style={{ marginTop: 13 }}>
             <input type="checkbox" checked={updateExisting} onChange={(e) => setUpdateExisting(e.target.checked)} />
-            <span><span><b>Update already completed topics</b><small>Off by default; existing trainer and date are preserved.</small></span></span>
+            <span><span><b>Update already completed topics</b><small>Off by default. Topics another trainer completed are never changed unless you are an admin.</small></span></span>
           </label>
           <div className="session-summary">
             <div><b>{selected.size}</b><span>attendees</span></div>
