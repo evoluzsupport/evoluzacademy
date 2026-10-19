@@ -32,6 +32,9 @@ export const hm = (min: number) => `${pad(Math.floor(min / 60))}:${pad(min % 60)
 
 const minutesOf = (iso: string) => Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16));
 
+/** How many busy slots (meetings or events) touch one day. */
+export const eventsOn = (day: string, slots: Slot[]) => slots.filter((s) => s.start.slice(0, 10) <= day && s.end.slice(0, 10) >= day).length;
+
 /** The free windows (minutes since midnight) inside working hours on one day, given the busy slots. */
 export function freeWindows(day: string, slots: Slot[]): [number, number][] {
   const busy = slots

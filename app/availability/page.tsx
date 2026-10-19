@@ -4,15 +4,15 @@ import { usePortal } from '@/lib/store';
 import { learners } from '@/lib/selectors';
 import { supabase } from '@/lib/supabase';
 import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
-import { DAY_END, DAY_START, addDays, freeWindows, hm, mondayOf, weekDays, ymd } from '@/lib/availability';
+import { DAY_END, DAY_START, addDays, eventsOn, freeWindows, hm, mondayOf, weekDays, ymd } from '@/lib/availability';
 import type { Avail } from '@/lib/availability';
 
-type Role = 'All' | 'Trainer' | 'Trainee';
+type Role = 'All' | 'Admin' | 'Trainer' | 'Trainee';
 interface Person {
   id: string;
   name: string;
   email: string;
-  role: 'Trainer' | 'Trainee';
+  role: 'Admin' | 'Trainer' | 'Trainee';
   tone: string;
 }
 
@@ -41,6 +41,7 @@ export default function AvailabilityPage() {
       seen.add(email);
       out.push({ id: p.id, name: p.name, email, role: r, tone: p.tone ?? '' });
     };
+    S.admins.forEach((t) => add(t, 'Admin'));
     S.trainers.forEach((t) => add(t, 'Trainer'));
     learners(S).forEach((t) => add(t, 'Trainee'));
     return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -87,7 +88,7 @@ export default function AvailabilityPage() {
     <Guard kinds={['admin']}>
       <PageHead
         title="Availability"
-        desc={`Free time for training in each person’s Zoho Calendar, ${hm(DAY_START)}–${hm(DAY_END)} on weekdays.`}
+        desc={`Free time for training and the number of meetings in each person’s Zoho Calendar, ${hm(DAY_START)}–${hm(DAY_END)} on weekdays.`}
         actions={
           <>
             <button className="btn" onClick={() => setMonday(addDays(monday, -7))}>‹ Prev</button>
@@ -99,7 +100,8 @@ export default function AvailabilityPage() {
       <div className="toolbar" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
         <b style={{ fontSize: 13 }}>{label}</b>
         <select className="select" value={role} onChange={(e) => setRole(e.target.value as Role)} aria-label="Show">
-          <option value="All">Trainers and trainees</option>
+          <option value="All">Admins, trainers and trainees</option>
+          <option value="Admin">Admins</option>
           <option value="Trainer">Trainers</option>
           <option value="Trainee">Trainees</option>
         </select>
@@ -118,6 +120,7 @@ export default function AvailabilityPage() {
                   {days.map((d) => (
                     <th key={ymd(d)}>{d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</th>
                   ))}
+                  <th>Week events</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,28 +131,33 @@ export default function AvailabilityPage() {
                       <td>
                         <div className="person"><Avatar name={p.name} tone={p.tone} />
                           <div>
-                            <div>{p.name} <span className={`pill ${p.role === 'Trainer' ? 'progress' : 'neutral'}`}>{p.role}</span></div>
+                            <div>{p.name} <span className={`pill ${p.role === 'Trainer' ? 'progress' : p.role === 'Admin' ? 'wait' : 'neutral'}`}>{p.role}</span></div>
                             <small className="subtle">{p.email}</small>
                           </div>
                         </div>
                       </td>
                       {!a || a.status !== 'ok' ? (
-                        <td colSpan={5} className="subtle">{!a ? (busy ? 'Loading…' : '—') : NOTE[a.status]}</td>
+                        <td colSpan={6} className="subtle">{!a ? (busy ? 'Loading…' : '—') : NOTE[a.status]}</td>
                       ) : (
-                        days.map((d) => {
-                          const free = freeWindows(ymd(d), a.slots);
-                          return (
-                            <td key={ymd(d)}>
-                              {free.length ? (
+                        <>
+                          {days.map((d) => {
+                            const free = freeWindows(ymd(d), a.slots);
+                            const n = eventsOn(ymd(d), a.slots);
+                            return (
+                              <td key={ymd(d)}>
                                 <div style={{ display: 'grid', gap: 4 }}>
-                                  {free.map(([s, e]) => <span key={s} className="pill active">{hm(s)}–{hm(e)}</span>)}
+                                  <small className="subtle">{n} {n === 1 ? 'meeting' : 'meetings'}</small>
+                                  {free.length ? (
+                                    free.map(([s, e]) => <span key={s} className="pill active">{hm(s)}–{hm(e)}</span>)
+                                  ) : (
+                                    <span className="pill overdue">Fully booked</span>
+                                  )}
                                 </div>
-                              ) : (
-                                <span className="pill overdue">Fully booked</span>
-                              )}
-                            </td>
-                          );
-                        })
+                              </td>
+                            );
+                          })}
+                          <td><b>{days.reduce((n, d) => n + eventsOn(ymd(d), a.slots), 0)}</b></td>
+                        </>
                       )}
                     </tr>
                   );
