@@ -4,7 +4,8 @@ import { usePortal } from '@/lib/store';
 import { learners } from '@/lib/selectors';
 import { supabase } from '@/lib/supabase';
 import { Avatar, Empty, Guard, PageHead } from '@/components/ui';
-import { DAY_END, DAY_START, addDays, eventsOn, freeWindows, hm, mondayOf, weekDays, ymd } from '@/lib/availability';
+import { DAY_END, DAY_START, addDays, eventsOn, freeWindows, fullWeek, hm, mondayOf, weekDays, ymd } from '@/lib/availability';
+import { CalendarPopup } from '@/components/CalendarPopup';
 import type { Avail } from '@/lib/availability';
 
 type Role = 'All' | 'Admin' | 'Trainer' | 'Trainee';
@@ -50,7 +51,10 @@ export default function AvailabilityPage() {
   const days = weekDays(monday);
   const emailKey = people.map((p) => p.email).join(',');
   const from = ymd(days[0]);
-  const to = ymd(days[4]);
+  // the whole week (Mon-Sun) is loaded so the calendar popup can show weekends too
+  const week = fullWeek(monday);
+  const to = ymd(week[6]);
+  const [open, setOpen] = useState<Person | null>(null);
 
   useEffect(() => {
     if (!people.length) return;
@@ -117,17 +121,17 @@ export default function AvailabilityPage() {
               <thead>
                 <tr>
                   <th>Person</th>
+                  <th>Meetings</th>
                   {days.map((d) => (
                     <th key={ymd(d)}>{d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</th>
                   ))}
-                  <th>Week events</th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map((p) => {
                   const a = data[p.email];
                   return (
-                    <tr key={p.email}>
+                    <tr key={p.email} onClick={() => setOpen(p)} style={{ cursor: 'pointer' }} title="Open calendar">
                       <td>
                         <div className="person"><Avatar name={p.name} tone={p.tone} />
                           <div>
@@ -140,6 +144,12 @@ export default function AvailabilityPage() {
                         <td colSpan={6} className="subtle">{!a ? (busy ? 'Loading…' : '—') : NOTE[a.status]}</td>
                       ) : (
                         <>
+                          <td>
+                            <div style={{ display: 'grid', gap: 5, justifyItems: 'start' }}>
+                              <b style={{ fontSize: 15 }}>{week.reduce((n, d) => n + eventsOn(ymd(d), a.slots), 0)}</b>
+                              <button className="btn" style={{ padding: '4px 8px', fontSize: 10 }} onClick={(e) => { e.stopPropagation(); setOpen(p); }}>View calendar</button>
+                            </div>
+                          </td>
                           {days.map((d) => {
                             const free = freeWindows(ymd(d), a.slots);
                             const n = eventsOn(ymd(d), a.slots);
@@ -156,7 +166,6 @@ export default function AvailabilityPage() {
                               </td>
                             );
                           })}
-                          <td><b>{days.reduce((n, d) => n + eventsOn(ymd(d), a.slots), 0)}</b></td>
                         </>
                       )}
                     </tr>
@@ -168,6 +177,7 @@ export default function AvailabilityPage() {
           {!shown.length && <Empty>No one matches that search.</Empty>}
         </section>
       )}
+      {open && <CalendarPopup name={open.name} email={open.email} role={open.role} avail={data[open.email]} monday={monday} loading={busy} onWeek={setMonday} onClose={() => setOpen(null)} />}
     </Guard>
   );
 }

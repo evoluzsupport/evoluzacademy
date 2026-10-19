@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import type { Avail, Slot } from '@/lib/availability';
+import type { Avail, CalEvent, Slot } from '@/lib/availability';
 
 export const runtime = 'nodejs';
 
 /**
- * Free/busy for a list of people from Zoho Calendar, through the Zoho MCP server in ZOHO_MCP_URL
+ * Free/busy and meetings from Zoho Calendar, through the Zoho MCP server in ZOHO_MCP_URL
  * (that URL holds a secret, so it only ever lives on the server). Admins only.
+ *
+ * Other people's calendars only give free/busy slots. The account the MCP is signed in as also gives
+ * full event details (titles, times, organiser), so that person's meetings are exact.
  */
 const MAX_EMAILS = 200;
 const CHUNK = 10;
@@ -30,17 +33,68 @@ function slotsOf(node: unknown, out: Slot[] = []): Slot[] {
   return out;
 }
 
-async function rpc(url: string, args: Record<string, string>) {
+async function tool(url: string, name: string, query_params: Record<string, unknown>) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'ZohoCalendar_get_busy_slots', arguments: { query_params: args } } }),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: { query_params } } }),
     cache: 'no-store',
   });
   const j = await res.json();
   const text: string | undefined = j?.result?.content?.[0]?.text;
-  const parsed = j?.result?.structuredContent?.data ?? (text ? JSON.parse(text) : null);
-  return (parsed?.userFreeBusy ?? []) as Record<string, unknown>[];
+  return (j?.result?.structuredContent?.data ?? (text ? JSON.parse(text) : null)) as Record<string, unknown> | null;
+}
+
+async function busyRows(url: string, args: Record<string, string>) {
+  const d = await tool(url, 'ZohoCalendar_get_busy_slots', args);
+  return ((d?.userFreeBusy as Record<string, unknown>[]) ?? []) as Record<string, unknown>[];
+}
+
+const ymdCompact = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+
+/** The signed-in account's own meetings for the range (full details), plus the name of its default calendar. */
+async function ownerEvents(url: string, from: string, to: string): Promise<{ local: string; events: CalEvent[] } | null> {
+  try {
+    const cals = await tool(url, 'ZohoCliq_list_calendars', {});
+    const list = (cals?.data as Record<string, unknown>[]) ?? [];
+    const own = list.find((c) => c.is_default && c.category === 'own');
+    if (!own?.calendar_uid) return null;
+    const end = new Date(to + 'T00:00:00');
+    end.setDate(end.getDate() + 1);
+    const d = await tool(url, 'ZohoCalendar_get_event', {
+      caluid: String(own.calendar_uid),
+      start: from.replace(/-/g, ''),
+      end: ymdCompact(end),
+      byinstance: 'true',
+      fields: 'title,dateandtime,organizer,isallday,location,url,attendees',
+    });
+    const raw = (d?.events as Record<string, unknown>[]) ?? [];
+    const events: CalEvent[] = [];
+    for (const e of raw) {
+      const dt = (e.dateandtime ?? {}) as Record<string, unknown>;
+      let s = toWall(dt.start);
+      let en = toWall(dt.end);
+      if (!s && /^\d{8}$/.test(String(dt.start ?? ''))) {
+        const v = String(dt.start);
+        s = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}T00:00`;
+        en = s;
+      }
+      if (!s || !en) continue;
+      events.push({
+        title: String(e.title ?? 'Busy'),
+        start: s,
+        end: en,
+        allDay: !!e.isallday,
+        organizer: e.organizer ? String(e.organizer) : undefined,
+        location: e.location ? String(e.location) : undefined,
+        url: e.url ? String(e.url) : undefined,
+        attendees: Array.isArray(e.attendees) ? e.attendees.length : undefined,
+      });
+    }
+    return { local: String(own.name ?? '').toLowerCase(), events };
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: Request) {
@@ -67,10 +121,11 @@ export async function POST(req: Request) {
   const results: Record<string, Avail> = {};
   const chunks: string[][] = [];
   for (let i = 0; i < emails.length; i += CHUNK) chunks.push(emails.slice(i, i + CHUNK));
-  await Promise.all(
-    chunks.map(async (group) => {
+  const [owner] = await Promise.all([
+    ownerEvents(url, body.from!, body.to!),
+    ...chunks.map(async (group) => {
       try {
-        const rows = await rpc(url, { attendees: group.join(','), sdate, edate, duration: '30', mode: 'busyslots' });
+        const rows = await busyRows(url, { attendees: group.join(','), sdate, edate, duration: '30', mode: 'busyslots' });
         for (const r of rows) {
           const email = String(r.emailid ?? '').toLowerCase();
           const err = typeof r.error === 'string' ? r.error : '';
@@ -80,10 +135,21 @@ export async function POST(req: Request) {
           else results[email] = { status: 'error', slots: [], message: err };
         }
       } catch {
-        for (const e of group) results[e] = { status: 'error', slots: [], message: 'Calendar did not respond' };
+        for (const e of group) results[e] ??= { status: 'error', slots: [], message: 'Calendar did not respond' };
       }
-    })
-  );
+    }),
+  ]);
   for (const e of emails) results[e] ??= { status: 'error', slots: [], message: 'No answer for this email' };
+
+  // the signed-in account: exact meetings instead of free/busy (its calendar may not be in free/busy at all)
+  if (owner?.local) {
+    const mine = emails.find((e) => e.split('@')[0] === owner.local);
+    if (mine)
+      results[mine] = {
+        status: 'ok',
+        events: owner.events,
+        slots: owner.events.filter((e) => !e.allDay).map((e) => ({ start: e.start, end: e.end })),
+      };
+  }
   return NextResponse.json({ results });
 }

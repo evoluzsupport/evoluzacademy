@@ -3,11 +3,23 @@ export interface Slot {
   start: string;
   end: string;
 }
+export interface CalEvent {
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  organizer?: string;
+  location?: string;
+  url?: string;
+  attendees?: number;
+}
 export type AvailStatus = 'ok' | 'not-shared' | 'no-calendar' | 'error';
 export interface Avail {
   status: AvailStatus;
   slots: Slot[];
   message?: string;
+  /** full event details: only available for the account the calendar connection is signed in as */
+  events?: CalEvent[];
 }
 
 /** Working window used to turn busy slots into free time. */
@@ -28,6 +40,7 @@ export const addDays = (d: Date, n: number) => {
   return x;
 };
 export const weekDays = (monday: Date) => Array.from({ length: 5 }, (_, i) => addDays(monday, i));
+export const fullWeek = (monday: Date) => Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 export const hm = (min: number) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
 
 const minutesOf = (iso: string) => Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16));
