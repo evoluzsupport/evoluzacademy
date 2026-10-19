@@ -14,7 +14,7 @@ interface NavItem {
   label: string;
   icon: string;
 }
-const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: NavItem[] }> = {
+const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: NavItem[]; adminOnly?: NavItem[] }> = {
   admin: {
     workspace: [
       { href: '/', label: 'Overview', icon: '⌂' },
@@ -28,6 +28,11 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
     insights: [
       { href: '/analytics', label: 'Analytics', icon: '◔' },
       { href: '/users', label: 'Users', icon: '⚿' },
+    ],
+    adminOnly: [
+      { href: '/assessments', label: 'Assessments', icon: '✎' },
+      { href: '/availability', label: 'Availability', icon: '◷' },
+      { href: '/integrations', label: 'Integrations', icon: '⚙' },
     ],
   },
   trainer: {
@@ -253,7 +258,7 @@ export default function Frame({ children }: { children: ReactNode }) {
 
   const nav = NAV[me.kind];
   const active = (href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
-  const current = [...nav.workspace, ...(nav.assigned ?? []), ...nav.insights, { href: '/profile', label: 'My profile', icon: '' }].find((n) => active(n.href));
+  const current = [...nav.workspace, ...(nav.assigned ?? []), ...nav.insights, ...(nav.adminOnly ?? []), { href: '/profile', label: 'My profile', icon: '' }].find((n) => active(n.href));
   const mine = me.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.tone : me.kind === 'trainee' ? S.trainees.find((t) => t.id === me.id)?.tone : '';
 
   const search = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -293,6 +298,12 @@ export default function Frame({ children }: { children: ReactNode }) {
           <>
             <div className="nav-label" style={{ marginTop: 17 }}>Insights</div>
             <nav className="nav">{nav.insights.map(link)}</nav>
+          </>
+        )}
+        {nav.adminOnly && nav.adminOnly.length > 0 && (
+          <>
+            <div className="nav-label" style={{ marginTop: 17 }}>Admin</div>
+            <nav className="nav">{nav.adminOnly.map(link)}</nav>
           </>
         )}
         <div className="side-bottom">
