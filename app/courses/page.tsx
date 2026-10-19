@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { match, usePortal } from '@/lib/store';
-import { primaryOf } from '@/lib/seed';
+import { courseTrainers, primaryOf } from '@/lib/seed';
 import { downloadCSV } from '@/lib/csv';
 import { Empty, Guard, PageHead, SectionTitle } from '@/components/ui';
 import { ViewBody, ViewSwitch, useView } from '@/components/views';
@@ -18,7 +18,7 @@ export default function CoursesPage() {
   const view = useView('courses');
   const groupers: Grouper<Course>[] = [
     { key: 'category', label: 'Category', of: (c) => c.group },
-    { key: 'trainer', label: 'Primary trainer', of: (c) => primaryOf(c) },
+    { key: 'trainer', label: 'Trainer', of: (c) => primaryOf(c) },
     { key: 'duration', label: 'Duration', of: (c) => c.duration },
   ];
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -107,7 +107,7 @@ export default function CoursesPage() {
               <dl className="vmeta">
                 <div><dt>Duration</dt><dd>{c.duration}</dd></div>
                 <div><dt>Topics</dt><dd>{c.topics.length}</dd></div>
-                <div><dt>Primary trainer</dt><dd>{primaryOf(c)}</dd></div>
+                <div><dt>{courseTrainers(c).length > 1 ? 'Trainers' : 'Trainer'}</dt><dd>{primaryOf(c)}</dd></div>
                 <div><dt>Learners</dt><dd>{S.assignments.filter((a) => a.courseId === c.id).length}</dd></div>
               </dl>
             </div>

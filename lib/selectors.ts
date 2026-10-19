@@ -1,6 +1,6 @@
 import type { Assignment, Course, Me, State, Topic, Trainee } from './types';
 import { daySort, isOverdue } from './util';
-import { primaryOf } from './seed';
+import { firstTrainer, primaryOf } from './seed';
 
 /** True when a trainer field ("Jyoti Raj/ Shivangi Kumari") names the given person. */
 export const nameMatches = (value: string | undefined, name: string | undefined) => {
@@ -184,7 +184,7 @@ export const trainerNames = (S: State, selected?: string) => {
 /** Map free-text topic trainer ("A/B") to a known trainer, else the course lead. */
 export const topicTrainer = (S: State, v: string | undefined, c: Course) => {
   const name = String(v || '').split(/[/,]/)[0].trim();
-  return S.trainers.some((r) => r.name === name) ? name : primaryOf(c);
+  return S.trainers.some((r) => r.name === name) ? name : firstTrainer(c);
 };
 
 export const plannedDays = (c: Course, selected?: string) => {

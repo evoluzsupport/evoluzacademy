@@ -13,6 +13,22 @@ type RawCourse = {
 
 const firstName = (v: string) => String(v || 'Project Manager').split(/[/,]/)[0].trim() || 'Project Manager';
 
+export const NO_TRAINER = 'No Trainer Assigned';
+
+/** A course (or assignment) can have several trainers, stored as "A / B". */
+export const splitTrainers = (v?: string): string[] =>
+  String(v || '')
+    .split(/\s*\/\s*/)
+    .map((x) => x.trim())
+    .filter((x) => x && x !== NO_TRAINER);
+export const joinTrainers = (names: string[]) => names.join(' / ') || NO_TRAINER;
+export const courseTrainers = (c?: Pick<Course, 'primaryTrainer'>) => splitTrainers(c?.primaryTrainer);
+/** The first trainer, for places that need one name (e.g. a default "delivered by"). */
+export const firstTrainer = (c?: Pick<Course, 'primaryTrainer'>) => courseTrainers(c)[0] || NO_TRAINER;
+/** Replace one trainer's name inside a "A / B" list, keeping the others. */
+export const renameTrainer = (list: string | undefined, from: string, to: string) =>
+  joinTrainers(splitTrainers(list).map((n) => (n === from ? to : n)));
+
 export const primaryOf = (c?: Pick<Course, 'primaryTrainer'>) => c?.primaryTrainer || 'No Trainer Assigned';
 
 export function curriculum(): Course[] {
@@ -84,7 +100,7 @@ export function makeSeed(): State {
     const t = trainees.find((x) => x.id === tid)!;
     const c = courses.find((x) => x.id === cid)!;
     assignments.push({ id: 'a' + (n + 1), traineeId: tid, courseId: cid, assignedOn: t.joined, due: '' });
-    const lead = tid === 't4' && cid === '05-zoho-crm' ? 'Jyoti' : primaryOf(c);
+    const lead = tid === 't4' && cid === '05-zoho-crm' ? 'Jyoti' : firstTrainer(c);
     for (let i = 0; i < count; i++) {
       progress[`${tid}|${cid}|${c.topics[i].id}`] = {
         done: true,

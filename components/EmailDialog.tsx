@@ -17,10 +17,10 @@ export function assignmentEmails(S: State, a: Assignment, assignedBy?: string): 
   if (!course || !learner) return [];
   const trainerName = a.trainer || primaryOf(course);
   const named = trainerName && trainerName !== 'No Trainer Assigned' ? trainerName : '';
-  const trainer = named ? [...S.trainers, ...S.admins].find((p) => nameMatches(named, p.name)) : undefined;
+  const trainers = named ? [...S.trainers, ...S.admins].filter((p) => nameMatches(named, p.name)) : [];
   const info = { origin, course: course.name, trainer: named, trainee: learner.name, topics: course.topics.length, start: a.startDate, due: a.due, assignedBy };
   const out = [{ label: `To trainee · ${learner.name}`, email: courseAssignedTrainee({ ...info, toName: learner.name, toEmail: learner.email }) }];
-  if (trainer) out.push({ label: `To trainer · ${trainer.name}`, email: courseAssignedTrainer({ ...info, toName: trainer.name, toEmail: trainer.email }) });
+  for (const trainer of trainers) out.push({ label: `To trainer · ${trainer.name}`, email: courseAssignedTrainer({ ...info, toName: trainer.name, toEmail: trainer.email }) });
   return out;
 }
 

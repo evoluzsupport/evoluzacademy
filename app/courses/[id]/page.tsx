@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 import { learners as allLearners, orderedTopics, scopeTrainees, statCourse, topicKey, visibleCourses } from '@/lib/selectors';
-import { primaryOf } from '@/lib/seed';
+import { courseTrainers, primaryOf } from '@/lib/seed';
 import { fmtDate, isOverdue } from '@/lib/util';
 import { downloadCSV, slug } from '@/lib/csv';
 import { Avatar, Empty, Guard, Pill, ProgressBar, SectionTitle, Stat } from '@/components/ui';
@@ -51,7 +51,7 @@ export default function CourseDetail() {
         <div>
           <div className="eyebrow"><Link href={me?.kind === 'trainer' ? '/my-courses' : '/courses'}>← Back to courses</Link></div>
           <h1>{c.name}</h1>
-          <p>{c.group} learning path · {c.duration} · Primary trainer: {primaryOf(c)}</p>
+          <p>{c.group} learning path · {c.duration} · {courseTrainers(c).length > 1 ? 'Trainers' : 'Trainer'}: {primaryOf(c)}</p>
         </div>
         <div className="actions">
           {isAdmin && <button className="btn" onClick={() => openModal(<ImportDialog kind="topics" courseId={c.id} />)}>Import topics</button>}

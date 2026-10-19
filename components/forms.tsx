@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
-import { primaryOf } from '@/lib/seed';
+import { courseTrainers, joinTrainers, renameTrainer } from '@/lib/seed';
 import { isAssigned, learners, nameMatches, plannedDays, topicTrainer, trainerNames } from '@/lib/selectors';
 import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
@@ -174,7 +174,7 @@ export function TrainerForm({ id }: { id?: string }) {
         const old = t.name;
         Object.assign(t, data);
         if (old !== name) {
-          s.courses.forEach((c) => { if (c.primaryTrainer === old) c.primaryTrainer = name; });
+          s.courses.forEach((c) => { c.primaryTrainer = renameTrainer(c.primaryTrainer, old, name); });
           s.trainees.forEach((x) => { if (x.trainer === old) x.trainer = name; });
           Object.values(s.progress).forEach((r) => { if (r.trainer === old) r.trainer = name; });
           s.sessions.forEach((x) => { if (x.trainer === old) x.trainer = name; });
@@ -224,18 +224,33 @@ export function TrainerForm({ id }: { id?: string }) {
   );
 }
 
+/** Tick one or more trainers. The selection is kept in the order they are ticked. */
+function TrainerPicker({ names, value, onChange }: { names: string[]; value: string[]; onChange: (v: string[]) => void }) {
+  const all = [...value.filter((v) => !names.includes(v)), ...names];
+  const toggle = (n: string) => onChange(value.includes(n) ? value.filter((x) => x !== n) : [...value, n]);
+  return (
+    <div className="trainer-picker" role="group" aria-label="Trainers" style={{ display: 'grid', gap: 6, maxHeight: 180, overflow: 'auto', padding: '8px 10px', border: '1px solid var(--line, #ddd)', borderRadius: 10 }}>
+      {all.map((n) => (
+        <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={value.includes(n)} onChange={() => toggle(n)} /> {n}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function CourseForm({ id }: { id?: string }) {
   const { S, update, closeModal, toast } = usePortal();
   const ex = id ? S.courses.find((c) => c.id === id) : undefined;
   const [name, setName] = useState(ex?.name ?? '');
   const [group, setGroup] = useState(ex?.group ?? 'Common');
   const [duration, setDuration] = useState(ex?.duration ?? '30 days');
-  const [lead, setLead] = useState(ex ? primaryOf(ex) : 'No Trainer Assigned');
+  const [trainers, setTrainers] = useState<string[]>(courseTrainers(ex));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast('Please add a course name');
-    const d = { name: name.trim(), group, duration: duration.trim() || 'Flexible', primaryTrainer: lead };
+    const d = { name: name.trim(), group, duration: duration.trim() || 'Flexible', primaryTrainer: joinTrainers(trainers) };
     update((s) => {
       if (id) Object.assign(s.courses.find((c) => c.id === id)!, d);
       else s.courses.push({ id: uid('c'), ...d, topics: [], extraDays: [] });
@@ -246,7 +261,7 @@ export function CourseForm({ id }: { id?: string }) {
   return (
     <>
       <h2>{id ? 'Edit course' : 'Create course'}</h2>
-      <p>{id ? 'Update learning path details and primary trainer.' : 'Add a course and assign its primary trainer.'}</p>
+      <p>{id ? 'Update learning path details and its trainers.' : 'Add a course and assign one or more trainers.'}</p>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Course name" full><input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Zoho Analytics" required /></Field>
@@ -256,11 +271,9 @@ export function CourseForm({ id }: { id?: string }) {
             </select>
           </Field>
           <Field label="Duration"><input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="e.g. 15 days" /></Field>
-          <Field label="Primary trainer" full>
-            <select value={lead} onChange={(e) => setLead(e.target.value)}>
-              {trainerNames(S, lead).map((n) => <option key={n}>{n}</option>)}
-            </select>
-            <small className="subtle">The person responsible for this course path. Session delivery can be credited to a substitute.</small>
+          <Field label="Trainers" full>
+            <TrainerPicker names={trainerNames(S).filter((n) => n !== 'No Trainer Assigned')} value={trainers} onChange={setTrainers} />
+            <small className="subtle">Tick every trainer for this course. Each of them sees its learners in their own panel and can mark topics. Session delivery can be credited to a substitute.</small>
           </Field>
         </div>
         <FormActions onCancel={closeModal} />
@@ -341,7 +354,8 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const [cid, setCid] = useState(courseId ?? '');
   const [start, setStart] = useState('');
   const [due, setDue] = useState('');
-  const [trainer, setTrainer] = useState('');
+  const [trainers, setTrainers] = useState<string[]>(() => courseTrainers(S.courses.find((c) => c.id === courseId)));
+  const trainer = joinTrainers(trainers);
 
   const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
   // Trainee: from the trainee data (the Trainees list). A trainer or admin joins it only when they are
@@ -360,7 +374,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const pickedTrainee = traineePool.find((t) => t.id === tid);
   // one person cannot be both the trainee and the trainer on the same course
   const trainees = traineePool.filter(
-    (t) => !same(t.name, trainer) && (t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))))
+    (t) => !trainers.some((n) => same(t.name, n)) && (t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))))
   );
   const trainerOptions = trainerPool.filter((n) => !same(n, pickedTrainee?.name));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
@@ -368,7 +382,8 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (start && due && due < start) return toast('Due date cannot be before the start date');
-    if (!assign(tid, cid, due, trainer === 'No Trainer Assigned' ? '' : trainer, start)) return toast('This trainee already has that course');
+    if (!trainers.length) return toast('Pick at least one trainer');
+    if (!assign(tid, cid, due, trainer, start)) return toast('This trainee already has that course');
     toast('Course assigned');
     closeModal();
     // send the "course assigned" emails to the trainee and the trainer automatically
@@ -391,16 +406,14 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
             </select>
           </Field>
           <Field label="Course" full>
-            <select value={cid} onChange={(e) => setCid(e.target.value)} disabled={!!courseId} required>
+            <select value={cid} onChange={(e) => { setCid(e.target.value); setTrainers(courseTrainers(S.courses.find((c) => c.id === e.target.value))); }} disabled={!!courseId} required>
               <option value="">Select course…</option>
               {courses.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.topics.length} topics)</option>)}
             </select>
           </Field>
-          <Field label="Trainer" full>
-            <select value={trainer} onChange={(e) => setTrainer(e.target.value)} required>
-              <option value="">Select trainer…</option>
-              {trainerOptions.map((n) => <option key={n}>{n}</option>)}
-            </select>
+          <Field label="Trainers" full>
+            <TrainerPicker names={trainerOptions} value={trainers} onChange={setTrainers} />
+            <small className="subtle">Filled in from the course's trainers. Every ticked trainer sees this trainee and course in their panel.</small>
           </Field>
           <Field label="Start date"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
           <Field label="Due date"><input type="date" value={due} min={start || undefined} onChange={(e) => setDue(e.target.value)} /></Field>

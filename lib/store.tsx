@@ -9,6 +9,7 @@ import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
 import { isAssigned, topicKey } from './selectors';
+import { renameTrainer } from './seed';
 import { supabase } from './supabase';
 
 interface ModalState {
@@ -543,7 +544,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         }
         // keep name references in step when a trainer is renamed
         if (prev && prev.name && prev.name !== name && wasTrainer) {
-          s.courses.forEach((c) => { if (c.primaryTrainer === prev.name) c.primaryTrainer = name; });
+          s.courses.forEach((c) => { c.primaryTrainer = renameTrainer(c.primaryTrainer, prev.name, name); });
           s.trainees.forEach((t) => { if (t.trainer === prev.name) t.trainer = name; });
           Object.values(s.progress).forEach((r) => { if (r.trainer === prev.name) r.trainer = name; });
           s.sessions.forEach((x) => { if (x.trainer === prev.name) x.trainer = name; });

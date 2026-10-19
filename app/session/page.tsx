@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey, visibleCourses } from '@/lib/selectors';
-import { primaryOf } from '@/lib/seed';
+import { firstTrainer, primaryOf } from '@/lib/seed';
 import { today, validPastOrToday } from '@/lib/util';
 import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
 import { TopicDetails } from '@/components/topic';
@@ -48,7 +48,7 @@ export default function SessionPage() {
   const startCourse = (id: string) => {
     const cc = myCourses.find((x) => x.id === id);
     setCourseId(id);
-    setTrainer(cc ? (myName ?? primaryOf(cc)) : '');
+    setTrainer(cc ? (myName ?? firstTrainer(cc)) : '');
     setDate(today());
     setMenuOpen(false);
     setTopicIds([]);
@@ -96,7 +96,7 @@ export default function SessionPage() {
     const attendees = traineeIds;
     if (!attendees.length || !topicIds.length) return toast('Choose a course, at least one attendee, and a topic');
     if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
-    const msg = saveSession({ courseId: c.id, trainer: trainer || primaryOf(c), date, traineeIds: attendees, topicIds, updateExisting });
+    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds, updateExisting });
     if (msg) {
       toast(msg);
       router.push('/sessions');
@@ -112,7 +112,7 @@ export default function SessionPage() {
       />
       <div className="grid" style={{ gap: 15 }}>
         <section className="card detail-panel">
-          <SectionTitle title="1 · Session details" right={<Pill kind="progress">Primary trainer · {primaryOf(c)}</Pill>} />
+          <SectionTitle title="1 · Session details" right={<Pill kind="progress">Trainer · {primaryOf(c)}</Pill>} />
           <div className="form-grid">
             <div className="field full">
               <label htmlFor="s-c2">Course</label>
@@ -122,8 +122,8 @@ export default function SessionPage() {
             </div>
             <div className="field">
               <label htmlFor="s-tr">Trainer who delivered this session</label>
-              <select id="s-tr" className="select" style={{ width: '100%' }} value={trainer || primaryOf(c)} onChange={(e) => setTrainer(e.target.value)}>
-                {(deliverers.includes(trainer || primaryOf(c)) ? deliverers : [trainer || primaryOf(c), ...deliverers]).map((n) => <option key={n}>{n}</option>)}
+              <select id="s-tr" className="select" style={{ width: '100%' }} value={trainer || firstTrainer(c)} onChange={(e) => setTrainer(e.target.value)}>
+                {(deliverers.includes(trainer || firstTrainer(c)) ? deliverers : [trainer || firstTrainer(c), ...deliverers]).map((n) => <option key={n}>{n}</option>)}
               </select>
             </div>
             <div className="field">

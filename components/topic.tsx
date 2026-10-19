@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { usePortal } from '@/lib/store';
-import { primaryOf } from '@/lib/seed';
-import { topicKey, trainerNames } from '@/lib/selectors';
+import { firstTrainer } from '@/lib/seed';
+import { nameMatches, topicKey, trainerNames } from '@/lib/selectors';
 import type { Course, Topic } from '@/lib/types';
 import { fmtDate, today } from '@/lib/util';
 
@@ -38,10 +38,11 @@ export function TopicDetails({ cover, activity }: { cover?: string; activity?: s
 
 /** One topic with its per-learner completion state; editable for trainers/admins. */
 export function TopicRow({ traineeId, course, topic, editable }: { traineeId: string; course: Course; topic: Topic; editable: boolean }) {
-  const { S, toggleTopic, patchCompletion } = usePortal();
+  const { S, me, toggleTopic, patchCompletion } = usePortal();
   const rec = S.progress[topicKey(traineeId, course.id, topic.id)];
   const done = !!rec?.done;
-  const [draftTrainer, setDraftTrainer] = useState(primaryOf(course));
+  // default "delivered by": the signed-in person when they are one of the course's trainers, else its first trainer
+  const [draftTrainer, setDraftTrainer] = useState(me && nameMatches(course.primaryTrainer, me.name) ? me.name : firstTrainer(course));
   const [draftDate, setDraftDate] = useState(today());
   const trainer = rec?.trainer ?? draftTrainer;
   const date = rec?.date ?? draftDate;

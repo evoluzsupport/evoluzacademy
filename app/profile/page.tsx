@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
 import { fmtDate } from '@/lib/util';
+import { renameTrainer } from '@/lib/seed';
 import { Guard, PageHead } from '@/components/ui';
 
 export default function ProfilePage() {
@@ -25,7 +26,7 @@ export default function ProfilePage() {
       x.name = name.trim();
       x.phone = phone.trim();
       if (me.kind === 'trainer' && old !== x.name) {
-        s.courses.forEach((c) => { if (c.primaryTrainer === old) c.primaryTrainer = x.name; });
+        s.courses.forEach((c) => { c.primaryTrainer = renameTrainer(c.primaryTrainer, old, x.name); });
         s.trainees.forEach((t) => { if (t.trainer === old) t.trainer = x.name; });
         Object.values(s.progress).forEach((r) => { if (r.trainer === old) r.trainer = x.name; });
         s.sessions.forEach((r) => { if (r.trainer === old) r.trainer = x.name; });
