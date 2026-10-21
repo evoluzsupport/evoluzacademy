@@ -153,6 +153,7 @@ export default function TraineeDetail() {
                 sub={
                   <>
                     {x.done} of {x.total} topics complete · {x.pct}% · Trainer: {trainerLinks(real(a.trainer) || real(primaryOf(c)) || real(t.trainer) || 'No Trainer Assigned')}
+                    {a.assignedBy && <> · Assigned by {a.assignedBy}</>}
                     {a.startDate && <> · <Pill kind="neutral">Starts {fmtDate(a.startDate)}</Pill></>}
                     {a.due && <> · <Pill kind={overdue ? 'overdue' : 'neutral'}>{overdue ? 'Overdue · ' : 'Due '}{fmtDate(a.due)}</Pill></>}
                   </>

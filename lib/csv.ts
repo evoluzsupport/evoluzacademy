@@ -94,3 +94,9 @@ export const TEMPLATE_COLUMNS: Record<ImportKind, string[]> = {
   curriculum: ['Course', 'Planned Day', 'Trainer Name', 'Category', 'Training Topic', 'What We Cover', 'Practical Activity / Assessment'],
   topics: ['Course', 'Planned Day', 'Trainer Name', 'Category', 'Training Topic', 'What We Cover', 'Practical Activity / Assessment'],
 };
+
+export const QUESTION_COLUMNS = ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer', 'Marks'];
+export const QUESTION_SAMPLES = [
+  ['Which Zoho app tracks projects and tasks?', 'Zoho Projects', 'Zoho Books', 'Zoho Vault', 'Zoho Meeting', 'A', '2'],
+  ['What does MFA stand for?', 'Managed File Access', 'Multi-Factor Authentication', 'Master Form Approval', 'Multiple Folder Access', 'B', '2'],
+];

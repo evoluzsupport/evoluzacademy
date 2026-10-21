@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Admin, AppUser, Assignment, Course, ProgressRec, Session, State, Trainee, Trainer } from './types';
+import type { Admin, AppUser, Assessment, AssessmentAssign, Assignment, Course, ProgressRec, Session, State, Trainee, Trainer } from './types';
 
 type Row = Record<string, unknown>;
 type Role = 'admin' | 'trainer' | 'trainee';
@@ -16,6 +16,8 @@ export const emptyState = (): State => ({
   assignments: [],
   progress: {},
   sessions: [],
+  assessments: [],
+  assessmentAssigns: [],
 });
 
 interface Table {
@@ -108,6 +110,7 @@ const TABLES: Table[] = [
         start_date: nul(a.startDate ?? ""),
         due: nul(a.due),
         trainer: a.trainer ?? '',
+        assigned_by: a.assignedBy ?? '',
       })),
   },
   {
@@ -146,6 +149,54 @@ const TABLES: Table[] = [
         const [trainee_id, course_id, topic_id] = k.split('|');
         return { trainee_id, course_id, topic_id, done_on: r.date, trainer: r.trainer, session_id: r.sessionId ?? null };
       }),
+  },
+  {
+    name: 'assessments',
+    pk: ['id'],
+    order: ['created_at', 'id'],
+    rows: (s) =>
+      s.assessments.map((a) => ({
+        id: a.id,
+        course_id: a.courseId,
+        title: a.title,
+        description: a.description,
+        duration_min: a.durationMin,
+        created_by: nul(a.createdBy),
+      })),
+  },
+  {
+    name: 'assessment_questions',
+    pk: ['id'],
+    order: ['assessment_id', 'position'],
+    rows: (s) =>
+      s.assessments.flatMap((a) =>
+        a.questions.map((q, i) => ({ id: q.id, assessment_id: a.id, position: i, text: q.text, options: q.options, marks: q.marks }))
+      ),
+  },
+  {
+    name: 'assessment_keys',
+    pk: ['question_id'],
+    order: ['question_id'],
+    rows: (s) => s.assessments.flatMap((a) => a.questions.filter((q) => q.answer >= 0).map((q) => ({ question_id: q.id, answer: q.answer }))),
+  },
+  {
+    name: 'assessment_assignments',
+    pk: ['id'],
+    order: ['id'],
+    rows: (s) =>
+      s.assessmentAssigns.map((a) => ({
+        id: a.id,
+        assessment_id: a.assessmentId,
+        trainee_id: a.traineeId,
+        assigned_on: nul(a.assignedOn),
+        due: nul(a.due),
+        status: a.status,
+        started_at: nul(a.startedAt),
+        submitted_at: nul(a.submittedAt),
+        score: a.score,
+        total: a.total,
+        answers: a.answers,
+      })),
   },
 ];
 
@@ -225,7 +276,7 @@ async function fetchAll(t: Table): Promise<Row[]> {
 }
 
 export async function loadRemote(): Promise<State> {
-  const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress] = await Promise.all(
+  const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress, asms, aqs, akeys, aassigns] = await Promise.all(
     TABLES.map(fetchAll)
   );
   const s = emptyState();
@@ -280,6 +331,7 @@ export async function loadRemote(): Promise<State> {
       startDate: str(a.start_date),
       due: str(a.due),
       trainer: str(a.trainer),
+      assignedBy: str(a.assigned_by),
     })
   );
 
@@ -306,6 +358,46 @@ export async function loadRemote(): Promise<State> {
     if (r.session_id) rec.sessionId = str(r.session_id);
     s.progress[`${r.trainee_id}|${r.course_id}|${r.topic_id}`] = rec;
   }
+
+  const keyOfQ = new Map(akeys.map((k) => [str(k.question_id), Number(k.answer)]));
+  const qsOf = new Map<string, Assessment['questions']>();
+  for (const q of aqs) {
+    const list = qsOf.get(str(q.assessment_id)) ?? [];
+    list.push({
+      id: str(q.id),
+      text: str(q.text),
+      options: Array.isArray(q.options) ? (q.options as unknown[]).map(str) : [],
+      answer: keyOfQ.get(str(q.id)) ?? -1,
+      marks: Number(q.marks) || 1,
+    });
+    qsOf.set(str(q.assessment_id), list);
+  }
+  s.assessments = asms.map(
+    (a): Assessment => ({
+      id: str(a.id),
+      courseId: str(a.course_id),
+      title: str(a.title),
+      description: str(a.description),
+      durationMin: Number(a.duration_min) || 60,
+      createdBy: str(a.created_by),
+      questions: qsOf.get(str(a.id)) ?? [],
+    })
+  );
+  s.assessmentAssigns = aassigns.map(
+    (a): AssessmentAssign => ({
+      id: str(a.id),
+      assessmentId: str(a.assessment_id),
+      traineeId: str(a.trainee_id),
+      assignedOn: str(a.assigned_on),
+      due: str(a.due),
+      status: a.status === 'submitted' ? 'submitted' : a.status === 'in-progress' ? 'in-progress' : 'assigned',
+      startedAt: str(a.started_at),
+      submittedAt: str(a.submitted_at),
+      score: a.score == null ? null : Number(a.score),
+      total: a.total == null ? null : Number(a.total),
+      answers: (a.answers as Record<string, number> | null) ?? {},
+    })
+  );
   return s;
 }
 

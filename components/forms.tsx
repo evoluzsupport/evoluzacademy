@@ -8,6 +8,7 @@ import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
 import { FormActions } from './ui';
 import { assignmentEmails } from './EmailDialog';
+import { AvailabilityBox } from './AvailabilityBox';
 import { sendAll } from '@/lib/mailer';
 import { EMAIL_ENABLED, welcomeEmail } from '@/lib/emails';
 
@@ -395,7 +396,8 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     }
   };
   return (
-    <>
+    <div className="assign-split">
+      <div>
       <h2>Assign a course</h2>
       <p>The trainee comes from the trainee list and the trainer from the trainer list. Progress starts separately for each learning path.</p>
       <form onSubmit={submit}>
@@ -421,6 +423,8 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
         </div>
         <FormActions onCancel={closeModal} save="Assign course" />
       </form>
-    </>
+      </div>
+      <AvailabilityBox />
+    </div>
   );
 }

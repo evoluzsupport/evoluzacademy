@@ -46,6 +46,107 @@ function place(blocks: Block[]): Placed[] {
   return out;
 }
 
+const blocksFor = (avail: Avail | undefined, day: string): Block[] => {
+  const exact = !!avail?.events;
+  const src = exact
+    ? (avail!.events ?? []).filter((e) => !e.allDay).map((e) => ({ title: e.title, start: e.start, end: e.end, sub: e.organizer ? `by ${e.organizer.split('@')[0]}` : undefined }))
+    : (avail?.slots ?? []).map((s) => ({ title: 'Busy', start: s.start, end: s.end, sub: undefined as string | undefined }));
+  return src
+    .filter((s) => s.start.slice(0, 10) <= day && s.end.slice(0, 10) >= day)
+    .map((s) => ({
+      title: s.title,
+      sub: s.sub,
+      exact,
+      startMin: s.start.slice(0, 10) < day ? 0 : minutes(s.start),
+      endMin: s.end.slice(0, 10) > day ? 24 * 60 : minutes(s.end),
+    }));
+};
+
+/** The week grid on its own: day headers plus hour rows with a person's meetings (or busy blocks). */
+export function WeekGrid({ avail, monday, maxHeight = '58vh' }: { avail: Avail; monday: Date; maxHeight?: string }) {
+  const days = fullWeek(monday);
+  const todayKey = ymd(new Date());
+  const hours = Array.from({ length: LAST - FIRST }, (_, i) => FIRST + i);
+  const allDay = (day: string) => (avail.events ?? []).filter((e) => e.allDay && e.start.slice(0, 10) <= day && e.end.slice(0, 10) >= day);
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--line)', background: '#fbfcfe' }}>
+        <div />
+        {days.map((d) => {
+          const k = ymd(d);
+          const ad = allDay(k);
+          return (
+            <div key={k} style={{ padding: '8px 4px', borderLeft: '1px solid var(--line)', textAlign: 'center', minWidth: 0 }}>
+              <div style={{ fontSize: 10, color: '#8a96a8' }}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: k === todayKey ? '#2e70c7' : undefined }}>{d.getDate()}</div>
+              {ad.map((e, i) => (
+                <div key={i} title={e.title} style={{ marginTop: 3, fontSize: 9, background: '#e4f0d4', borderRadius: 4, padding: '2px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ maxHeight, overflow: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(7, minmax(0, 1fr))', position: 'relative' }}>
+          <div>
+            {hours.map((h) => (
+              <div key={h} style={{ height: PX, fontSize: 10, color: '#98a3b1', textAlign: 'right', padding: '0 6px 0 0', transform: 'translateY(-6px)' }}>
+                {h === FIRST ? '' : hm(h * 60)}
+              </div>
+            ))}
+          </div>
+          {days.map((d) => {
+            const k = ymd(d);
+            const blocks = place(blocksFor(avail, k));
+            return (
+              <div
+                key={k}
+                style={{
+                  position: 'relative',
+                  height: GRID_H,
+                  borderLeft: '1px solid var(--line)',
+                  background: `repeating-linear-gradient(to bottom, transparent 0, transparent ${PX - 1}px, #eef1f6 ${PX - 1}px, #eef1f6 ${PX}px)`,
+                }}
+              >
+                {blocks.map((b, i) => {
+                  const top = Math.max(0, ((b.startMin - FIRST * 60) / 60) * PX);
+                  const bottom = Math.min(GRID_H, ((b.endMin - FIRST * 60) / 60) * PX);
+                  if (bottom <= 0 || top >= GRID_H) return null;
+                  const h = Math.max(18, bottom - top - 1);
+                  return (
+                    <div
+                      key={i}
+                      title={`${b.title} · ${hm(b.startMin)}–${hm(Math.min(b.endMin, 24 * 60 - 1))}${b.sub ? ` · ${b.sub}` : ''}`}
+                      style={{
+                        position: 'absolute',
+                        top,
+                        height: h,
+                        left: `calc(${(b.lane / b.lanes) * 100}% + 2px)`,
+                        width: `calc(${100 / b.lanes}% - 4px)`,
+                        background: b.exact ? '#e4f0d4' : '#e9eef8',
+                        borderLeft: `3px solid ${b.exact ? '#8cbf40' : '#7d94c9'}`,
+                        borderRadius: 5,
+                        padding: '2px 5px',
+                        fontSize: 10,
+                        lineHeight: 1.3,
+                        overflow: 'hidden',
+                        color: '#26344b',
+                      }}
+                    >
+                      <b style={{ display: 'block', textTransform: 'none' }}>{b.title}</b>
+                      <span style={{ color: '#6a7790' }}>{hm(b.startMin)}–{hm(Math.min(b.endMin, 24 * 60 - 1))}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** A Zoho-style week calendar for one person. Real meetings when we have them, otherwise "Busy" blocks. */
 export function CalendarPopup({
   name,
@@ -74,25 +175,7 @@ export function CalendarPopup({
 
   const days = fullWeek(monday);
   const exact = !!avail?.events;
-  const todayKey = ymd(new Date());
-  const hours = Array.from({ length: LAST - FIRST }, (_, i) => FIRST + i);
-
-  const forDay = (day: string): Block[] => {
-    const src = exact
-      ? (avail!.events ?? []).filter((e) => !e.allDay).map((e) => ({ title: e.title, start: e.start, end: e.end, sub: e.organizer ? `by ${e.organizer.split('@')[0]}` : undefined }))
-      : (avail?.slots ?? []).map((s) => ({ title: 'Busy', start: s.start, end: s.end, sub: undefined as string | undefined }));
-    return src
-      .filter((s) => s.start.slice(0, 10) <= day && s.end.slice(0, 10) >= day)
-      .map((s) => ({
-        title: s.title,
-        sub: s.sub,
-        exact,
-        startMin: s.start.slice(0, 10) < day ? 0 : minutes(s.start),
-        endMin: s.end.slice(0, 10) > day ? 24 * 60 : minutes(s.end),
-      }));
-  };
-  const allDay = (day: string) => (avail?.events ?? []).filter((e) => e.allDay && e.start.slice(0, 10) <= day && e.end.slice(0, 10) >= day);
-  const total = days.reduce((n, d) => n + forDay(ymd(d)).length, 0);
+  const total = days.reduce((n, d) => n + blocksFor(avail, ymd(d)).length, 0);
   const range = `${days[0].toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
   return (
@@ -121,81 +204,7 @@ export function CalendarPopup({
         ) : (
           <>
             {!exact && <p className="subtle" style={{ margin: '0 0 8px' }}>Only busy time is shared for this person, so meeting titles are not shown.</p>}
-            <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--line)', background: '#fbfcfe' }}>
-                <div />
-                {days.map((d) => {
-                  const k = ymd(d);
-                  const ad = allDay(k);
-                  return (
-                    <div key={k} style={{ padding: '8px 6px', borderLeft: '1px solid var(--line)', textAlign: 'center', minWidth: 0 }}>
-                      <div style={{ fontSize: 10, color: '#8a96a8' }}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
-                      <div style={{ fontSize: 17, fontWeight: 700, color: k === todayKey ? '#2e70c7' : undefined }}>{d.getDate()}</div>
-                      {ad.map((e, i) => (
-                        <div key={i} title={e.title} style={{ marginTop: 3, fontSize: 9, background: '#e4f0d4', borderRadius: 4, padding: '2px 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ maxHeight: '58vh', overflow: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, minmax(0, 1fr))', position: 'relative' }}>
-                  <div>
-                    {hours.map((h) => (
-                      <div key={h} style={{ height: PX, fontSize: 10, color: '#98a3b1', textAlign: 'right', padding: '0 8px 0 0', transform: 'translateY(-6px)' }}>
-                        {h === FIRST ? '' : hm(h * 60)}
-                      </div>
-                    ))}
-                  </div>
-                  {days.map((d) => {
-                    const k = ymd(d);
-                    const blocks = place(forDay(k));
-                    return (
-                      <div
-                        key={k}
-                        style={{
-                          position: 'relative',
-                          height: GRID_H,
-                          borderLeft: '1px solid var(--line)',
-                          background: `repeating-linear-gradient(to bottom, transparent 0, transparent ${PX - 1}px, #eef1f6 ${PX - 1}px, #eef1f6 ${PX}px)`,
-                        }}
-                      >
-                        {blocks.map((b, i) => {
-                          const top = Math.max(0, ((b.startMin - FIRST * 60) / 60) * PX);
-                          const bottom = Math.min(GRID_H, ((b.endMin - FIRST * 60) / 60) * PX);
-                          if (bottom <= 0 || top >= GRID_H) return null;
-                          const h = Math.max(18, bottom - top - 1);
-                          return (
-                            <div
-                              key={i}
-                              title={`${b.title} · ${hm(b.startMin)}–${hm(Math.min(b.endMin, 24 * 60 - 1))}${b.sub ? ` · ${b.sub}` : ''}`}
-                              style={{
-                                position: 'absolute',
-                                top,
-                                height: h,
-                                left: `calc(${(b.lane / b.lanes) * 100}% + 2px)`,
-                                width: `calc(${100 / b.lanes}% - 4px)`,
-                                background: b.exact ? '#e4f0d4' : '#e9eef8',
-                                borderLeft: `3px solid ${b.exact ? '#8cbf40' : '#7d94c9'}`,
-                                borderRadius: 5,
-                                padding: '2px 5px',
-                                fontSize: 10,
-                                lineHeight: 1.3,
-                                overflow: 'hidden',
-                                color: '#26344b',
-                              }}
-                            >
-                              <b style={{ display: 'block', textTransform: 'none' }}>{b.title}</b>
-                              <span style={{ color: '#6a7790' }}>{hm(b.startMin)}–{hm(Math.min(b.endMin, 24 * 60 - 1))}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <WeekGrid avail={avail} monday={monday} />
           </>
         )}
       </div>

@@ -86,7 +86,7 @@ function Tracker() {
                       <td><b>{cc.name}</b></td>
                       <td><b>{assignedTrainer}</b></td>
                       <td>{primaryOf(cc)}</td>
-                      <td>{fmtDate(a.assignedOn)}</td>
+                      <td>{fmtDate(a.assignedOn)}{a.assignedBy && <small className="subtle" style={{ display: 'block' }}>by {a.assignedBy}</small>}</td>
 <td>{a.startDate ? fmtDate(a.startDate) : '—'}</td>
                       <td>{a.due ? fmtDate(a.due) : '—'}</td>
                       <td><ProgressBar pct={st.pct} /></td>
