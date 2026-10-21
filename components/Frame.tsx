@@ -54,6 +54,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/', label: 'Overview', icon: '⌂' },
       { href: '/tracker', label: 'My Course', icon: '▤' },
       { href: '/trainers', label: 'My Trainer', icon: '♧' },
+      { href: '/my-assessments', label: 'My Assessments', icon: '✎' },
     ],
     insights: [],
   },

@@ -48,6 +48,8 @@ export interface Ctx {
   loginWithZoho: () => Promise<string | null>;
   logout: () => void;
   update: (fn: (s: State) => void) => void;
+  /** reload everything from the database (e.g. after a trainee submits an assessment) */
+  refresh: () => Promise<void>;
   toast: (m: string) => void;
   toastMsg: string;
   modal: ModalState | null;
@@ -72,6 +74,13 @@ export interface Ctx {
   removeUser: (id: string) => void;
   addPeople: (people: { name: string; email: string }[]) => { added: number; skipped: string[] };
   importCSV: (kind: ImportKind, file: File, courseId?: string) => Promise<void>;
+}
+
+/** Removes the assessments of the given courses together with their assignments and results. */
+function dropAssessments(s: State, courseIds: Set<string>) {
+  const gone = new Set(s.assessments.filter((a) => courseIds.has(a.courseId)).map((a) => a.id));
+  s.assessments = s.assessments.filter((a) => !gone.has(a.id));
+  s.assessmentAssigns = s.assessmentAssigns.filter((a) => !gone.has(a.assessmentId));
 }
 
 const PortalCtx = createContext<Ctx | null>(null);
@@ -448,6 +457,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const removeCourse: Ctx['removeCourse'] = (id) => {
       update((s) => {
         s.courses = s.courses.filter((c) => c.id !== id);
+        dropAssessments(s, new Set([id]));
         s.assignments = s.assignments.filter((a) => a.courseId !== id);
         for (const k of Object.keys(s.progress)) if (k.split('|')[1] === id) delete s.progress[k];
       });
@@ -458,6 +468,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       const gone = new Set(ids);
       update((s) => {
         s.courses = s.courses.filter((c) => !gone.has(c.id));
+        dropAssessments(s, gone);
         s.assignments = s.assignments.filter((a) => !gone.has(a.courseId));
         for (const k of Object.keys(s.progress)) if (gone.has(k.split('|')[1])) delete s.progress[k];
         s.sessions = s.sessions.filter((x) => !gone.has(x.courseId));
@@ -620,6 +631,10 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     clearAuthError: () => setAuthError(''),
     logout,
     update,
+    refresh: () => {
+      queue.current = queue.current.then(reload);
+      return queue.current;
+    },
     toast,
     toastMsg,
     modal,

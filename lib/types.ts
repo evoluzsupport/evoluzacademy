@@ -86,6 +86,38 @@ export interface Session {
   newMarks: number;
   existingPreserved: number;
 }
+export interface Question {
+  id: string;
+  text: string;
+  options: string[];
+  /** index of the correct option; -1 when the answer key is hidden (trainees never receive it) */
+  answer: number;
+  marks: number;
+}
+export interface Assessment {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+  /** 60 to 90 minutes */
+  durationMin: number;
+  createdBy: string;
+  questions: Question[];
+}
+export interface AssessmentAssign {
+  id: string;
+  assessmentId: string;
+  traineeId: string;
+  assignedOn: string;
+  due: string;
+  status: 'assigned' | 'in-progress' | 'submitted';
+  startedAt: string;
+  submittedAt: string;
+  score: number | null;
+  total: number | null;
+  /** question id to chosen option index */
+  answers: Record<string, number>;
+}
 export interface State {
   admins: Admin[];
   trainers: Trainer[];
@@ -97,6 +129,8 @@ export interface State {
   /** key: `${traineeId}|${courseId}|${topicId}` */
   progress: Record<string, ProgressRec>;
   sessions: Session[];
+  assessments: Assessment[];
+  assessmentAssigns: AssessmentAssign[];
 }
 export interface Me {
   kind: Kind;
