@@ -77,7 +77,7 @@ export function AvailabilityBox({ role: initial = 'Trainer', email: initialEmail
       <h3 style={{ margin: '0 0 10px', font: '800 15px Manrope' }}>Available Slot for Training</h3>
       <div className="form-grid">
         <div className="field">
-          <label>Lookup</label>
+          <label>User Type</label>
           <select value={role} onChange={(e) => { setRole(e.target.value as Role); setEmail(''); }}>
             <option value="Trainer">Trainer</option>
             <option value="Trainee">Trainee</option>
@@ -85,7 +85,7 @@ export function AvailabilityBox({ role: initial = 'Trainer', email: initialEmail
           </select>
         </div>
         <div className="field">
-          <label>Available Member</label>
+          <label>Available User</label>
           <select value={email} onChange={(e) => setEmail(e.target.value)}>
             <option value="">Select {role.toLowerCase()}…</option>
             {members.map((m) => <option key={m.email} value={m.email}>{m.name}</option>)}
