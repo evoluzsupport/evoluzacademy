@@ -33,7 +33,8 @@ export default function SessionPage() {
     };
   }, [menuOpen]);
 
-  const myName = me?.kind === 'trainer' ? S.trainers.find((t) => t.id === me.id)?.name : undefined;
+  // whoever is logging the session (trainer or admin) is the default deliverer; they can still pick someone else
+  const myName = me && me.kind !== 'trainee' ? me.name : undefined;
   const myCourses = visibleCourses(S, me);
   const c = myCourses.find((x) => x.id === courseId);
   const scope = new Set(scopeTrainees(S, me).map((t) => t.id));
