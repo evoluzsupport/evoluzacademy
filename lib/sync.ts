@@ -110,6 +110,7 @@ const TABLES: Table[] = [
         start_date: nul(a.startDate ?? ""),
         due: nul(a.due),
         trainer: a.trainer ?? '',
+        assigned_by: a.assignedBy ?? '',
       })),
   },
   {
@@ -330,6 +331,7 @@ export async function loadRemote(): Promise<State> {
       startDate: str(a.start_date),
       due: str(a.due),
       trainer: str(a.trainer),
+      assignedBy: str(a.assigned_by),
     })
   );
 

@@ -93,7 +93,7 @@ function applySession(s: State, d: SessionDraft): string | null {
   const attendees = d.traineeIds.filter((tid) => known.has(tid));
   if (!c || !attendees.length || !d.topicIds.length) return null;
   for (const tid of attendees)
-    if (!isAssigned(s, tid, c.id)) s.assignments.push({ id: uid('a'), traineeId: tid, courseId: c.id, assignedOn: today(), due: '' });
+    if (!isAssigned(s, tid, c.id)) s.assignments.push({ id: uid('a'), traineeId: tid, courseId: c.id, assignedOn: today(), due: '', assignedBy: d.by?.name ?? '' });
   const id = uid('s');
   let newMarks = 0;
   let kept = 0;
@@ -384,7 +384,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const assign: Ctx['assign'] = (traineeId, courseId, due = '', trainer = '', startDate = '') => {
       if (isAssigned(S0.current, traineeId, courseId)) return false;
       update((s) => {
-        s.assignments.push({ id: uid('a'), traineeId, courseId, assignedOn: today(), startDate, due, trainer });
+        s.assignments.push({ id: uid('a'), traineeId, courseId, assignedOn: today(), startDate, due, trainer, assignedBy: meRef.current?.name ?? '' });
       });
       return true;
     };

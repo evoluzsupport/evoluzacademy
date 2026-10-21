@@ -68,6 +68,8 @@ export interface Assignment {
   due: string;
   /** trainer responsible for this learner on this course */
   trainer?: string;
+  /** name of the admin or trainer who made the assignment */
+  assignedBy?: string;
 }
 export interface ProgressRec {
   done: true;

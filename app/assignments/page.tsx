@@ -90,7 +90,7 @@ export default function AssignmentsPage() {
                         {trainerNames(S, a.trainer || undefined).filter((n) => n !== 'No Trainer Assigned').map((n) => <option key={n}>{n}</option>)}
                       </select>
                     </td>
-                    <td>{fmtDate(a.assignedOn)}</td>
+                    <td>{fmtDate(a.assignedOn)}{a.assignedBy && <small className="subtle" style={{ display: 'block' }}>by {a.assignedBy}</small>}</td>
                     <td>
                       <input className="input" type="date" aria-label={`Start date for ${t!.name}, ${c!.name}`} style={{ padding: '5px 7px', fontSize: 11 }} value={a.startDate ?? ''} onChange={(e) => setStart(a.id, e.target.value)} />
                     </td>
