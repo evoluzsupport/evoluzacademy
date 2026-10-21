@@ -164,3 +164,10 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .sidebar{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
 .sidebar .side-bottom{flex-shrink:0}
 .sidebar .brand,.sidebar .nav-label,.sidebar .nav{flex-shrink:0}
+
+.modal:has(.assign-split){width:min(1180px,100%)}
+.assign-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:24px;align-items:start}
+.assign-split h2{font:800 18px Manrope;margin:0 0 5px}
+.assign-split p{color:#8591a3;font-size:12px;margin:0 0 19px}
+.avail-box{border-left:1px solid var(--line);padding-left:24px;min-width:0}
+@media(max-width:900px){.assign-split{grid-template-columns:1fr}.avail-box{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:16px}}
