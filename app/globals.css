@@ -98,6 +98,7 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .nico.n-teach{background:#e3f5ec;color:#168767}
 .nico.n-overdue{background:#fde8ec;color:#c45562}
 .nico.n-hold{background:#fff1da;color:#b9741c}
+.nico.n-ticket{background:#eef3fe;color:#3f6ad8}
 .nico.n-nocourse{background:#f1f3f6;color:#7e8999}
 .ntext{min-width:0;flex:1;display:grid;gap:2px}
 .ntext b{font-size:12px;color:#26344b;text-transform:none}
