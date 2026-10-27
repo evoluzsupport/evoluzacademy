@@ -248,7 +248,7 @@ export function learnersOfTrainer(S: State, name: string, pool: Trainee[]): Trai
 
 export interface Notice {
   id: string;
-  kind: 'assigned' | 'teach' | 'learn' | 'overdue' | 'hold' | 'nocourse';
+  kind: 'assigned' | 'teach' | 'learn' | 'overdue' | 'hold' | 'nocourse' | 'ticket';
   title: string;
   sub: string;
   href: string;

@@ -18,6 +18,8 @@ export default function SessionPage() {
   const [topicIds, setTopicIds] = useState<string[]>([]);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [attendeeQ, setAttendeeQ] = useState('');
+  const [topicQ, setTopicQ] = useState('');
   const picker = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,6 +54,8 @@ export default function SessionPage() {
     setTrainer(cc ? (myName ?? firstTrainer(cc)) : '');
     setDate(today());
     setMenuOpen(false);
+    setAttendeeQ('');
+    setTopicQ('');
     setTopicIds([]);
     setUpdateExisting(false);
     setTraineeIds(cc ? S.trainees.filter((t) => isAssigned(S, t.id, cc.id) && scope.has(t.id)).map((t) => t.id) : []);
@@ -85,6 +89,10 @@ export default function SessionPage() {
   const selected = new Set(traineeIds);
   const chosen = new Set(topicIds);
   const names = eligible.filter((t) => selected.has(t.id)).map((t) => t.name);
+  const aq = attendeeQ.trim().toLowerCase();
+  const shownPeople = aq ? eligible.filter((t) => `${t.name} ${t.label}`.toLowerCase().includes(aq)) : eligible;
+  const tq = topicQ.trim().toLowerCase();
+  const shownTopics = orderedTopics(c).filter((x) => !tq || `${x.topic} ${x.day} ${x.category ?? ''}`.toLowerCase().includes(tq));
   let marks = 0;
   let already = 0;
   chosen.forEach((topicId) =>
@@ -153,8 +161,11 @@ export default function SessionPage() {
                     <button type="button" className="btn" onClick={() => setTraineeIds([])}>Clear</button>
                   </span>
                 </div>
+                <div style={{ padding: '8px 12px' }}>
+                  <input className="input" style={{ width: '100%' }} type="search" placeholder="Search by name or role…" aria-label="Search attendees" value={attendeeQ} onChange={(e) => setAttendeeQ(e.target.value)} />
+                </div>
                 <div className="attendee-option-list">
-                  {eligible.map((t) => (
+                  {shownPeople.map((t) => (
                     <label className="attendee-option" key={t.id}>
                       <input type="checkbox" checked={selected.has(t.id)} onChange={(e) => setTraineeIds((l) => toggle(l, t.id, e.target.checked))} />
                       <span className="attendee-identity">
@@ -165,6 +176,7 @@ export default function SessionPage() {
                     </label>
                   ))}
                   {!eligible.length && <div className="empty">No users have been added yet.</div>}
+                  {!!eligible.length && !shownPeople.length && <div className="empty">No one matches “{attendeeQ}”.</div>}
                 </div>
               </div>
             )}
@@ -177,8 +189,10 @@ export default function SessionPage() {
             sub="Every checked topic will be marked for all selected trainees above."
             right={<button className="btn soft" onClick={() => setTopicIds(c.topics.map((t) => t.id))}>Select all topics</button>}
           />
+          <input className="input" style={{ width: '100%', marginBottom: 10 }} type="search" placeholder="Search topics…" aria-label="Search topics" value={topicQ} onChange={(e) => setTopicQ(e.target.value)} />
           <div className="choice-list topic-choices">
-            {orderedTopics(c).map((x) => (
+            {!shownTopics.length && <div className="empty">No topics match “{topicQ}”.</div>}
+            {shownTopics.map((x) => (
               <label className="choice topic-choice" key={x.id}>
                 <input type="checkbox" checked={chosen.has(x.id)} onChange={(e) => setTopicIds((l) => toggle(l, x.id, e.target.checked))} />
                 <span>

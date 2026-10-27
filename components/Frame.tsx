@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { usePortal } from '@/lib/store';
 import { notificationsFor, scopeTrainees, visibleCourses } from '@/lib/selectors';
+import type { Notice } from '@/lib/selectors';
+import { supabase } from '@/lib/supabase';
 import type { Kind } from '@/lib/types';
 import { initials } from '@/lib/util';
 
@@ -24,6 +26,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/assignments', label: 'Ongoing Training Session', icon: '⇄' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
+      { href: '/tickets', label: 'Tickets', icon: '✉' },
     ],
     insights: [
       { href: '/analytics', label: 'Analytics', icon: '◔' },
@@ -42,6 +45,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/my-courses', label: 'Assigned Courses', icon: '▤' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
+      { href: '/tickets', label: 'My Tickets', icon: '✉' },
     ],
     assigned: [
       { href: '/my-trainer', label: 'My Trainer', icon: '♧' },
@@ -55,6 +59,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/tracker', label: 'My Course', icon: '▤' },
       { href: '/trainers', label: 'My Trainer', icon: '♧' },
       { href: '/my-assessments', label: 'My Assessments', icon: '✎' },
+      { href: '/tickets', label: 'My Tickets', icon: '✉' },
     ],
     insights: [],
   },
@@ -63,8 +68,8 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
 const ROLE_LABEL: Record<Kind, string> = { admin: 'Training coordinator', trainer: 'Trainer', trainee: 'Trainee' };
 const TONES = ['', 'coral', 'mint', 'lilac'];
 
-const NOTICE_ICON: Record<string, string> = { assigned: '▤', teach: '♧', learn: '▤', overdue: '!', hold: '❚❚', nocourse: '＋' };
-const NOTICE_LABEL: Record<string, string> = { assigned: 'New course', teach: 'Teaching', learn: 'Learning', overdue: 'Overdue', hold: 'On hold', nocourse: 'No course' };
+const NOTICE_ICON: Record<string, string> = { assigned: '▤', teach: '♧', learn: '▤', overdue: '!', hold: '❚❚', nocourse: '＋', ticket: '✉' };
+const NOTICE_LABEL: Record<string, string> = { assigned: 'New course', teach: 'Teaching', learn: 'Learning', overdue: 'Overdue', hold: 'On hold', nocourse: 'No course', ticket: 'Ticket' };
 
 const ago = (d?: string) => {
   if (!d) return '';
@@ -79,7 +84,8 @@ function Bell() {
   const [seen, setSeen] = useState<string[]>([]);
   const box = useRef<HTMLDivElement>(null);
   const key = `evoluzSeen:${me?.id ?? ''}`;
-  const items = notificationsFor(S, me);
+  const [tickets, setTickets] = useState<Notice[]>([]);
+  const items = [...tickets, ...notificationsFor(S, me)];
   const unread = items.filter((x) => !seen.includes(x.id));
 
   useEffect(() => {
@@ -87,6 +93,36 @@ function Bell() {
       setSeen(JSON.parse(localStorage.getItem(key) || '[]'));
     } catch {}
   }, [key]);
+  // admins hear about newly raised tickets; the person who raised one hears about replies. RLS limits rows to what each can see.
+  const meId = me?.id;
+  const admin = me?.kind === 'admin';
+  useEffect(() => {
+    if (!meId) return;
+    let live = true;
+    const pull = async () => {
+      const { data } = await supabase.from('tickets').select('id,number,raised_by,subject,status,response,handled_by,created_at,updated_at').order('created_at', { ascending: false }).limit(50);
+      if (!live || !data) return;
+      const people = [...S.trainees, ...S.trainers, ...S.admins];
+      const out: Notice[] = [];
+      for (const r of data) {
+        const date = String(r.created_at ?? '').slice(0, 10);
+        if (admin && r.status === 'open') {
+          const by = people.find((p) => p.id === r.raised_by)?.name ?? 'Someone';
+          out.push({ id: `tk:${r.id}`, kind: 'ticket', title: `New ticket #${r.number}: ${r.subject}`, sub: `Raised by ${by}`, href: '/tickets', date });
+        } else if (!admin && r.raised_by === meId && (r.response || r.status !== 'open')) {
+          out.push({ id: `tkr:${r.id}:${r.status}:${String(r.updated_at ?? '')}`, kind: 'ticket', title: `Ticket #${r.number} is ${String(r.status).replace('-', ' ')}`, sub: r.handled_by ? `Updated by ${r.handled_by}` : String(r.subject), href: '/tickets', date: String(r.updated_at ?? r.created_at ?? '').slice(0, 10) });
+        }
+      }
+      setTickets(out);
+    };
+    void pull();
+    const timer = setInterval(() => void pull(), 60000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meId, admin, S.trainees.length, S.trainers.length, S.admins.length]);
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
