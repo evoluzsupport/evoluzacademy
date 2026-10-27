@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { usePortal } from '@/lib/store';
 import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey, visibleCourses } from '@/lib/selectors';
 import { firstTrainer, primaryOf } from '@/lib/seed';
-import { today, validPastOrToday } from '@/lib/util';
+import { fmtDate, today, validPastOrToday } from '@/lib/util';
 import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
 import { TopicDetails } from '@/components/topic';
 
@@ -58,7 +58,7 @@ export default function SessionPage() {
     setTopicQ('');
     setTopicIds([]);
     setUpdateExisting(false);
-    setTraineeIds(cc ? S.trainees.filter((t) => isAssigned(S, t.id, cc.id) && scope.has(t.id)).map((t) => t.id) : []);
+    setTraineeIds([]);
   };
 
   const head = (
@@ -88,6 +88,10 @@ export default function SessionPage() {
   const eligible = everyone;
   const selected = new Set(traineeIds);
   const chosen = new Set(topicIds);
+  // topics every selected attendee has already done on this course (logged by any trainer or admin) show ticked and locked
+  const doneBy = (tid: string, topicId: string) => S.progress[topicKey(tid, c.id, topicId)];
+  const lockedTopic = (topicId: string) => !updateExisting && selected.size > 0 && [...selected].every((tid) => doneBy(tid, topicId)?.done);
+  const todayLog = (tid: string) => S.sessions.filter((x) => x.date === today() && x.courseId === c.id && x.traineeIds.includes(tid));
   const names = eligible.filter((t) => selected.has(t.id)).map((t) => t.name);
   const aq = attendeeQ.trim().toLowerCase();
   const shownPeople = aq ? eligible.filter((t) => `${t.name} ${t.label}`.toLowerCase().includes(aq)) : eligible;
@@ -103,9 +107,10 @@ export default function SessionPage() {
 
   const save = () => {
     const attendees = traineeIds;
-    if (!attendees.length || !topicIds.length) return toast('Choose a course, at least one attendee, and a topic');
+    const toSave = topicIds.filter((id) => !lockedTopic(id));
+    if (!attendees.length || !toSave.length) return toast('Choose a course, at least one attendee, and a topic');
     if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
-    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds, updateExisting, by: me ? { name: me.name, admin: me.kind === 'admin' } : undefined });
+    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds: toSave, updateExisting, by: me ? { name: me.name, admin: me.kind === 'admin' } : undefined });
     if (msg) {
       toast(msg);
       router.push('/sessions');
@@ -143,7 +148,7 @@ export default function SessionPage() {
         </section>
 
         <section className="card detail-panel">
-          <SectionTitle title="2 · Who is attending?" sub="Assigned trainees are selected by default. Remove anyone absent, or add anyone else from the list. Anyone not yet on this course is assigned when you save." />
+          <SectionTitle title="2 · Who is attending?" sub="Tick everyone who attended. Anyone in the directory can be added. Anyone not yet on this course is assigned when you save." />
           <div className="attendee-picker" ref={picker}>
             <button type="button" className="attendee-trigger" aria-expanded={menuOpen} aria-controls="attendeeMenu" onClick={() => setMenuOpen((o) => !o)}>
               <span className="attendee-trigger-copy">
@@ -172,7 +177,10 @@ export default function SessionPage() {
                         <Avatar name={t.name} tone={t.tone} />
                         <span><b>{t.name}</b><small>{t.label}</small></span>
                       </span>
-                      <em>{isAssigned(S, t.id, c.id) ? `${statCourse(S, t.id, c).done}/${c.topics.length} done` : 'Not assigned'}</em>
+                      <em>
+                        {isAssigned(S, t.id, c.id) ? `${statCourse(S, t.id, c).done}/${c.topics.length} done` : 'Not assigned'}
+                        {todayLog(t.id).length > 0 && ` · Logged today (${new Set(todayLog(t.id).flatMap((x) => x.topicIds)).size} topics)`}
+                      </em>
                     </label>
                   ))}
                   {!eligible.length && <div className="empty">No users have been added yet.</div>}
@@ -192,16 +200,27 @@ export default function SessionPage() {
           <input className="input" style={{ width: '100%', marginBottom: 10 }} type="search" placeholder="Search topics…" aria-label="Search topics" value={topicQ} onChange={(e) => setTopicQ(e.target.value)} />
           <div className="choice-list topic-choices">
             {!shownTopics.length && <div className="empty">No topics match “{topicQ}”.</div>}
-            {shownTopics.map((x) => (
+            {shownTopics.map((x) => {
+              const locked = lockedTopic(x.id);
+              const doneN = [...selected].filter((tid) => doneBy(tid, x.id)?.done).length;
+              const last = [...selected].map((tid) => doneBy(tid, x.id)).find((r) => r?.done);
+              return (
               <label className="choice topic-choice" key={x.id}>
-                <input type="checkbox" checked={chosen.has(x.id)} onChange={(e) => setTopicIds((l) => toggle(l, x.id, e.target.checked))} />
+                <input type="checkbox" checked={locked || chosen.has(x.id)} disabled={locked} onChange={(e) => setTopicIds((l) => toggle(l, x.id, e.target.checked))} />
                 <span>
                   <b>{x.topic}</b>
                   <small>{x.day}{x.category ? ` · ${x.category}` : ''}</small>
+                  {doneN > 0 && (
+                    <small style={{ color: 'var(--ok, #1a8f5a)' }}>
+                      {locked ? 'Already covered' : `Covered for ${doneN} of ${selected.size} selected`}
+                      {last?.trainer ? ` by ${last.trainer}` : ''}{last?.date ? ` on ${fmtDate(last.date)}` : ''}
+                    </small>
+                  )}
                   <TopicDetails cover={x.cover} activity={x.activity} />
                 </span>
               </label>
-            ))}
+              );
+            })}
           </div>
           <label className="choice" style={{ marginTop: 13 }}>
             <input type="checkbox" checked={updateExisting} onChange={(e) => setUpdateExisting(e.target.checked)} />
