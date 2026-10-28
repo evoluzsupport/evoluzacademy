@@ -379,7 +379,13 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const trainees = traineePool.filter(
     (t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid)))
   );
-  const trainerOptions = trainerPool.filter((n) => !same(n, pickedTrainee?.name));
+  // Same name does not mean same person: two people can share a name with different emails. A trainer name is
+  // the learner only when the learner is that trainer record itself.
+  const isLearner = (n: string, learnerId: string, learnerName?: string) => {
+    const recs = S.trainers.filter((t) => same(t.name, n));
+    return recs.length ? recs.every((r) => r.id === learnerId) : same(n, learnerName);
+  };
+  const trainerOptions = trainerPool.filter((n) => !isLearner(n, tid, pickedTrainee?.name));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
 
   const submit = (e: FormEvent) => {
@@ -408,7 +414,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
               const p = traineePool.find((x) => x.id === e.target.value);
               setTid(e.target.value);
               // one person cannot be both the learner and the trainer on the same course
-              if (p) setTrainers((cur) => cur.filter((n) => !same(n, p.name)));
+              if (p) setTrainers((cur) => cur.filter((n) => !isLearner(n, p.id, p.name)));
             }} disabled={!!traineeId} required>
               <option value="">Select trainee…</option>
               {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}</option>)}
