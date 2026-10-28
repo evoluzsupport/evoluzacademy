@@ -385,6 +385,13 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     const recs = S.trainers.filter((t) => same(t.name, n));
     return recs.length ? recs.every((r) => r.id === learnerId) : same(n, learnerName);
   };
+  // search box: match name, email or label; the picked person always stays in the list
+  const [q, setQ] = useState('');
+  const needle = q.trim().toLowerCase();
+  const emailOf = (id: string) => [...S.trainees, ...S.trainers, ...S.admins].find((p) => p.id === id)?.email ?? '';
+  const shown = trainees.filter(
+    (t) => t.id === tid || !needle || `${t.name} ${t.label} ${emailOf(t.id)}`.toLowerCase().includes(needle)
+  );
   const trainerOptions = trainerPool.filter((n) => !isLearner(n, tid, pickedTrainee?.name));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
 
@@ -410,6 +417,9 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Trainee" full>
+            {!traineeId && (
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainees and trainers by name or email…" aria-label="Search trainee" style={{ marginBottom: 6 }} />
+            )}
             <select value={tid} onChange={(e) => {
               const p = traineePool.find((x) => x.id === e.target.value);
               setTid(e.target.value);
@@ -417,7 +427,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
               if (p) setTrainers((cur) => cur.filter((n) => !isLearner(n, p.id, p.name)));
             }} disabled={!!traineeId} required>
               <option value="">Select trainee…</option>
-              {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}</option>)}
+              {shown.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}{emailOf(t.id) ? ` (${emailOf(t.id)})` : ""}</option>)}
             </select>
           </Field>
           <Field label="Course" full>
