@@ -72,7 +72,7 @@ export default function CalendarPage() {
     if (!looksValid(url)) return toast('Paste your Zoho MCP link (https://…zohomcp…)');
     if (!me) return;
     const { error } = await supabase.from('calendar_connections').upsert({ profile_id: me.id, mcp_url: url, updated_at: new Date().toISOString() });
-    if (error) return toast('Could not save the link');
+    if (error) return toast(setup ? 'Could not save the link' : 'Saving is not switched on yet. Ask an admin to run supabase/calendar.sql');
     setSaved(url);
     setEditing(false);
     setLink('');
@@ -86,8 +86,8 @@ export default function CalendarPage() {
   return (
     <Guard kinds={['admin', 'trainer', 'trainee']}>
       <PageHead title="Calendar" desc="Connect your Zoho Calendar once with your MCP link. Your meetings show here, and admins can see your availability." />
-      {!setup && <section className="card empty">Calendar storage isn’t set up yet. Ask an admin to run supabase/calendar.sql.</section>}
-      {setup && saved !== null && (
+      {!setup && <section className="card empty" style={{ marginBottom: 14 }}>Saving isn’t switched on yet: the calendar table is missing in the database. An admin needs to run supabase/calendar.sql once.</section>}
+      {saved !== null && (
         <section className="card" style={{ padding: 16, marginBottom: 14 }}>
           {showForm ? (
             <form onSubmit={save} style={{ display: 'grid', gap: 10 }}>
