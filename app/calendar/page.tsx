@@ -96,22 +96,36 @@ export default function CalendarPage() {
     <Guard kinds={['admin', 'trainer', 'trainee']}>
       <PageHead title="Calendar" desc="Connect your Zoho Calendar once with your MCP link. Your meetings show here, and admins can see your availability." />
       {!setup && <section className="card empty" style={{ marginBottom: 14 }}>Saving isn’t switched on yet: the calendar table is missing in the database. An admin needs to run supabase/calendar.sql once.</section>}
-      <section className="card" style={{ padding: 16, marginBottom: 14 }}>
-        <h3 style={{ margin: '0 0 8px', font: '800 14px Manrope' }}>Before you paste the link</h3>
-        <ol style={{ margin: '0 0 12px', paddingLeft: 18, display: 'grid', gap: 6, fontSize: 12 }}>
-          <li>In your Zoho MCP server, open <b>Tools</b> and switch on the <b>Zoho Calendar</b> tools listed below. Add <b>Zoho Cliq</b> too, so your calendars can be listed.</li>
-          <li>Open <b>Connection</b> and choose <b>Authorization via Connection</b> (not “Authorization on Demand”). Add a connection for <b>Zoho Calendar, Zoho Cliq</b> and make sure its status is <b>Connected</b>. The tools are then pre-authorized with your account.</li>
-          <li>Copy the <b>Server URL</b> and paste it in the form below.</li>
+      <section className="card cal-guide">
+        <div className="cal-guide-head">
+          <h3>Connect in 3 steps</h3>
+          <span>One time only, takes about a minute</span>
+        </div>
+        <ol className="cal-steps">
+          <li className="cal-step">
+            <div className="cal-step-num">1</div>
+            <b>Switch on the tools</b>
+            <p>In your Zoho MCP server open <em>Tools</em> and enable the Zoho Calendar tools below. Add <em>Zoho Cliq</em> too, so your calendars can be listed.</p>
+          </li>
+          <li className="cal-step">
+            <div className="cal-step-num">2</div>
+            <b>Authorize with a connection</b>
+            <p>Open <em>Connection</em>, pick <em>Authorization via Connection</em> and add one for Zoho Calendar, Zoho Cliq. Wait for the status <em>Connected</em>.</p>
+          </li>
+          <li className="cal-step">
+            <div className="cal-step-num">3</div>
+            <b>Paste the Server URL</b>
+            <p>Copy the <em>Server URL</em> from your MCP server and paste it in the form below, then save.</p>
+          </li>
         </ol>
-        <div className="table-wrap">
-          <table className="table" style={{ minWidth: 0 }}>
-            <thead><tr><th>Calendar tool (scope)</th><th>Used for</th></tr></thead>
-            <tbody>
-              {TOOLS.map(([t, d]) => (
-                <tr key={t}><td><b>{t}</b></td><td className="subtle">{d}</td></tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="cal-tools-title">Calendar tools to enable</div>
+        <div className="cal-tools">
+          {TOOLS.map(([t, d]) => (
+            <div className="cal-tool" key={t}>
+              <i>✓</i>
+              <div><b>{t}</b><small>{d}</small></div>
+            </div>
+          ))}
         </div>
       </section>
       {saved !== null && (

@@ -172,3 +172,22 @@ h1,h2,h3,h4,th,label,legend,button,.btn,.nav a,.nav-label,.eyebrow,.lp-eyebrow,.
 .assign-split p{color:#8591a3;font-size:12px;margin:0 0 19px}
 .avail-box{border-left:1px solid var(--line);padding-left:24px;min-width:0}
 @media(max-width:900px){.assign-split{grid-template-columns:1fr}.avail-box{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:16px}}
+
+/* Calendar setup guide */
+.cal-guide{padding:20px;margin-bottom:14px;background:linear-gradient(145deg,#f6f9ff,#fff 55%)}
+.cal-guide-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.cal-guide-head h3{font:800 15px Manrope;margin:0}
+.cal-guide-head span{font-size:11px;color:var(--muted)}
+.cal-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 18px;padding:0;list-style:none}
+.cal-step{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 15px 15px;box-shadow:0 6px 18px #203d700a}
+.cal-step-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font:800 13px Manrope;background:linear-gradient(135deg,#2e70c7,#3f4cad);margin-bottom:10px;box-shadow:0 4px 10px #3158b633}
+.cal-step b{display:block;font:700 13px Manrope;margin-bottom:5px}
+.cal-step p{margin:0;font-size:11.5px;line-height:1.55;color:#5d6b82}
+.cal-step em{font-style:normal;font-weight:700;color:#2c54ae;background:#eef4fc;border-radius:5px;padding:1px 6px;white-space:nowrap}
+.cal-tools-title{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#7283a0;margin:0 0 10px}
+.cal-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cal-tool{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.cal-tool i{font-style:normal;flex:none;width:20px;height:20px;border-radius:6px;display:grid;place-items:center;background:#e9f6f0;color:#248264;font-size:12px;font-weight:800;margin-top:1px}
+.cal-tool b{display:block;font-size:12px;color:#26344b}
+.cal-tool small{display:block;font-size:10.5px;color:#8591a3;line-height:1.45;margin-top:3px}
+@media(max-width:900px){.cal-steps,.cal-tools{grid-template-columns:1fr}}
