@@ -363,7 +363,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   // Learner: the trainee list plus every trainer (trainers can learn courses too). An admin joins only when
   // they are being added as a trainee, which passes their id in.
   const traineePool = [
-    ...learners(S).map((t) => ({ id: t.id, name: t.name, label: t.jobRole || 'Trainee' })),
+    ...learners(S).map((t) => ({ id: t.id, name: t.name, label: 'Trainee' })),
     ...S.trainers.filter((p) => !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainer' })),
     ...S.admins.filter((p) => p.id === traineeId && !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainee' })),
   ].sort((a, b) => a.name.localeCompare(b.name));
@@ -377,7 +377,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const pickedTrainee = traineePool.find((t) => t.id === tid);
   // one person cannot be both the trainee and the trainer on the same course
   const trainees = traineePool.filter(
-    (t) => !trainers.some((n) => same(t.name, n)) && (t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))))
+    (t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid)))
   );
   const trainerOptions = trainerPool.filter((n) => !same(n, pickedTrainee?.name));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
@@ -404,7 +404,12 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Trainee" full>
-            <select value={tid} onChange={(e) => setTid(e.target.value)} disabled={!!traineeId} required>
+            <select value={tid} onChange={(e) => {
+              const p = traineePool.find((x) => x.id === e.target.value);
+              setTid(e.target.value);
+              // one person cannot be both the learner and the trainer on the same course
+              if (p) setTrainers((cur) => cur.filter((n) => !same(n, p.name)));
+            }} disabled={!!traineeId} required>
               <option value="">Select trainee…</option>
               {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}</option>)}
             </select>
