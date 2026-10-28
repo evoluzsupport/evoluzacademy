@@ -26,6 +26,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/assignments', label: 'Ongoing Training Session', icon: '⇄' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
+      { href: '/calendar', label: 'Calendar', icon: '▦' },
       { href: '/tickets', label: 'Tickets', icon: '✉' },
     ],
     insights: [
@@ -45,6 +46,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/my-courses', label: 'Assigned Courses', icon: '▤' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
+      { href: '/calendar', label: 'Calendar', icon: '▦' },
       { href: '/tickets', label: 'My Tickets', icon: '✉' },
     ],
     assigned: [
@@ -59,6 +61,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/tracker', label: 'My Course', icon: '▤' },
       { href: '/trainers', label: 'My Trainer', icon: '♧' },
       { href: '/my-assessments', label: 'My Assessments', icon: '✎' },
+      { href: '/calendar', label: 'Calendar', icon: '▦' },
       { href: '/tickets', label: 'My Tickets', icon: '✉' },
     ],
     insights: [],

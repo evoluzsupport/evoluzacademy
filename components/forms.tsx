@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
 import { courseTrainers, joinTrainers, renameTrainer } from '@/lib/seed';
-import { isAssigned, learners, nameMatches, plannedDays, topicTrainer, trainerNames } from '@/lib/selectors';
+import { assignmentsOf, courseById, isAssigned, learners, nameMatches, plannedDays, topicTrainer, trainerNames } from '@/lib/selectors';
 import type { Course, State, Topic, Trainee, Trainer } from '@/lib/types';
 import { dayNumber, daySort, today, uid } from '@/lib/util';
 import { FormActions } from './ui';
@@ -468,6 +468,11 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
                 if (p) setTrainers((cur) => cur.filter((n) => !isLearner(n, p.id, p.name)));
               }}
             />
+            {!!tid && !!assignmentsOf(S, tid).length && (
+              <small className="subtle">
+                Already assigned: {assignmentsOf(S, tid).map((x) => courseById(S, x.courseId)?.name).filter(Boolean).join(', ')}
+              </small>
+            )}
           </Field>
           <Field label="Course" full>
             <select value={cid} onChange={(e) => { setCid(e.target.value); setTrainers(courseTrainers(S.courses.find((c) => c.id === e.target.value))); }} disabled={!!courseId} required>
@@ -485,7 +490,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
         <FormActions onCancel={closeModal} save="Assign course" />
       </form>
       </div>
-      <AvailabilityBox />
+      <AvailabilityBox key={tid} role={(pickedTrainee?.label as 'Trainer' | 'Trainee' | 'Admin') || 'Trainee'} email={tid ? emailOf(tid).trim().toLowerCase() : ''} />
     </div>
   );
 }
