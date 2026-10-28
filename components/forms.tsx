@@ -360,11 +360,12 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const trainer = joinTrainers(trainers);
 
   const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-  // Trainee: from the trainee data (the Trainees list). A trainer or admin joins it only when they are
-  // being added as a trainee, which passes their id in.
+  // Learner: the trainee list plus every trainer (trainers can learn courses too). An admin joins only when
+  // they are being added as a trainee, which passes their id in.
   const traineePool = [
     ...learners(S).map((t) => ({ id: t.id, name: t.name, label: t.jobRole || 'Trainee' })),
-    ...[...S.trainers, ...S.admins].filter((p) => p.id === traineeId && !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainee' })),
+    ...S.trainers.filter((p) => !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainer' })),
+    ...S.admins.filter((p) => p.id === traineeId && !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainee' })),
   ].sort((a, b) => a.name.localeCompare(b.name));
   // Trainer: from the trainer data (the Trainers list), plus anyone named as a course lead.
   const trainerPool = [
@@ -399,7 +400,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     <div className="assign-split">
       <div>
       <h2>Assign a course</h2>
-      <p>The trainee comes from the trainee list and the trainer from the trainer list. Progress starts separately for each learning path.</p>
+      <p>The learner can be a trainee or a trainer; the trainer comes from the trainer list. Progress starts separately for each learning path.</p>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Trainee" full>
