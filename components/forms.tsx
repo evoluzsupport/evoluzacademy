@@ -225,6 +225,14 @@ export function TrainerForm({ id }: { id?: string }) {
   );
 }
 
+/** Access follows the trainer list. Anyone named as a trainer on a course or assignment who is still a plain
+ *  trainee gets trainer access, so they can see their own learners. Admins already see everything. */
+function grantTrainerAccess(S: State, setRole: (id: string, role: 'trainer') => boolean, names: string[]) {
+  S.trainees
+    .filter((t) => names.some((n) => n.trim().toLowerCase() === t.name.trim().toLowerCase()))
+    .forEach((t) => setRole(t.id, 'trainer'));
+}
+
 /** Tick one or more trainers. The selection is kept in the order they are ticked. */
 function TrainerPicker({ names, value, onChange }: { names: string[]; value: string[]; onChange: (v: string[]) => void }) {
   const all = [...value.filter((v) => !names.includes(v)), ...names];
@@ -242,7 +250,7 @@ function TrainerPicker({ names, value, onChange }: { names: string[]; value: str
 }
 
 export function CourseForm({ id }: { id?: string }) {
-  const { S, update, closeModal, toast } = usePortal();
+  const { S, update, closeModal, toast, setRole } = usePortal();
   const ex = id ? S.courses.find((c) => c.id === id) : undefined;
   const [name, setName] = useState(ex?.name ?? '');
   const [group, setGroup] = useState(ex?.group ?? 'Common');
@@ -253,6 +261,7 @@ export function CourseForm({ id }: { id?: string }) {
     e.preventDefault();
     if (!name.trim()) return toast('Please add a course name');
     const d = { name: name.trim(), group, duration: duration.trim() || 'Flexible', primaryTrainer: joinTrainers(trainers) };
+    grantTrainerAccess(S, setRole, trainers);
     update((s) => {
       if (id) Object.assign(s.courses.find((c) => c.id === id)!, d);
       else s.courses.push({ id: uid('c'), ...d, topics: [], extraDays: [] });
@@ -386,7 +395,7 @@ function PersonSearch({ options, value, onChange, disabled }: { options: { id: s
 }
 
 export function AssignDialog({ traineeId, courseId }: { traineeId?: string; courseId?: string }) {
-  const { S, assign, closeModal, openModal, toast, me } = usePortal();
+  const { S, assign, closeModal, openModal, toast, me, setRole } = usePortal();
   const [tid, setTid] = useState(traineeId ?? '');
   const [cid, setCid] = useState(courseId ?? '');
   const [start, setStart] = useState('');
@@ -430,6 +439,7 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
     if (!tid) return toast('Pick a trainee');
     if (!trainers.length) return toast('Pick at least one trainer');
     if (!assign(tid, cid, due, trainer, start)) return toast('This trainee already has that course');
+    grantTrainerAccess(S, setRole, trainers.filter((n) => !isLearner(n, tid, pickedTrainee?.name)));
     toast('Course assigned');
     closeModal();
     // send the "course assigned" emails to the trainee and the trainer automatically
