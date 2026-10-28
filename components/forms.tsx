@@ -350,6 +350,41 @@ export function TopicForm({ courseId, topicId }: { courseId: string; topicId?: s
   );
 }
 
+/** A picklist with a search box inside it: type to narrow the list, click a person to pick them. */
+function PersonSearch({ options, value, onChange, disabled }: { options: { id: string; text: string }[]; value: string; onChange: (id: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const picked = options.find((o) => o.id === value);
+  const needle = q.trim().toLowerCase();
+  const list = options.filter((o) => !needle || o.text.toLowerCase().includes(needle));
+  return (
+    <div style={{ position: 'relative' }} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>
+      <input
+        value={open ? q : picked?.text ?? ''}
+        placeholder="Search and select trainee…"
+        aria-label="Trainee"
+        aria-required="true"
+        role="combobox"
+        aria-expanded={open}
+        disabled={disabled}
+        onFocus={() => { setQ(''); setOpen(true); }}
+        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        autoComplete="off"
+      />
+      {open && !disabled && (
+        <div role="listbox" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: '100%', marginTop: 4, maxHeight: 220, overflow: 'auto', background: 'var(--panel, #fff)', border: '1px solid var(--line, #ddd)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+          {list.length ? list.map((o) => (
+            <button type="button" role="option" aria-selected={o.id === value} key={o.id} onClick={() => { onChange(o.id); setOpen(false); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', border: 0, background: o.id === value ? 'rgba(0,0,0,.06)' : 'transparent', cursor: 'pointer', fontSize: 13 }}>
+              {o.text}
+            </button>
+          )) : <div style={{ padding: '8px 12px', fontSize: 12, opacity: .7 }}>No match</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AssignDialog({ traineeId, courseId }: { traineeId?: string; courseId?: string }) {
   const { S, assign, closeModal, openModal, toast, me } = usePortal();
   const [tid, setTid] = useState(traineeId ?? '');
@@ -363,9 +398,9 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   // Learner: the trainee list plus every trainer (trainers can learn courses too). An admin joins only when
   // they are being added as a trainee, which passes their id in.
   const traineePool = [
-    ...learners(S).map((t) => ({ id: t.id, name: t.name, label: t.jobRole || 'Trainee' })),
+    ...learners(S).map((t) => ({ id: t.id, name: t.name, label: 'Trainee' })),
     ...S.trainers.filter((p) => !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainer' })),
-    ...S.admins.filter((p) => p.id === traineeId && !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Trainee' })),
+    ...S.admins.filter((p) => !learners(S).some((t) => t.id === p.id)).map((p) => ({ id: p.id, name: p.name, label: 'Admin' })),
   ].sort((a, b) => a.name.localeCompare(b.name));
   // Trainer: from the trainer data (the Trainers list), plus anyone named as a course lead.
   const trainerPool = [
@@ -377,14 +412,22 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
   const pickedTrainee = traineePool.find((t) => t.id === tid);
   // one person cannot be both the trainee and the trainer on the same course
   const trainees = traineePool.filter(
-    (t) => !trainers.some((n) => same(t.name, n)) && (t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid))))
+    (t) => t.id === traineeId || (!traineeId && !(cid && isAssigned(S, t.id, cid)))
   );
-  const trainerOptions = trainerPool.filter((n) => !same(n, pickedTrainee?.name));
+  // Same name does not mean same person: two people can share a name with different emails. A trainer name is
+  // the learner only when the learner is that trainer record itself.
+  const isLearner = (n: string, learnerId: string, learnerName?: string) => {
+    const recs = S.trainers.filter((t) => same(t.name, n));
+    return recs.length ? recs.every((r) => r.id === learnerId) : same(n, learnerName);
+  };
+  const emailOf = (id: string) => [...S.trainees, ...S.trainers, ...S.admins].find((p) => p.id === id)?.email ?? '';
+  const trainerOptions = trainerPool.filter((n) => !isLearner(n, tid, pickedTrainee?.name));
   const courses = S.courses.filter((c) => c.id === courseId || (!courseId && !(tid && isAssigned(S, tid, c.id))));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (start && due && due < start) return toast('Due date cannot be before the start date');
+    if (!tid) return toast('Pick a trainee');
     if (!trainers.length) return toast('Pick at least one trainer');
     if (!assign(tid, cid, due, trainer, start)) return toast('This trainee already has that course');
     toast('Course assigned');
@@ -404,10 +447,17 @@ export function AssignDialog({ traineeId, courseId }: { traineeId?: string; cour
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Trainee" full>
-            <select value={tid} onChange={(e) => setTid(e.target.value)} disabled={!!traineeId} required>
-              <option value="">Select trainee…</option>
-              {trainees.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.label}</option>)}
-            </select>
+            <PersonSearch
+              options={trainees.map((t) => ({ id: t.id, text: `${t.name} — ${t.label}${emailOf(t.id) ? ` (${emailOf(t.id)})` : ''}` }))}
+              value={tid}
+              disabled={!!traineeId}
+              onChange={(id) => {
+                const p = traineePool.find((x) => x.id === id);
+                setTid(id);
+                // one person cannot be both the learner and the trainer on the same course
+                if (p) setTrainers((cur) => cur.filter((n) => !isLearner(n, p.id, p.name)));
+              }}
+            />
           </Field>
           <Field label="Course" full>
             <select value={cid} onChange={(e) => { setCid(e.target.value); setTrainers(courseTrainers(S.courses.find((c) => c.id === e.target.value))); }} disabled={!!courseId} required>
