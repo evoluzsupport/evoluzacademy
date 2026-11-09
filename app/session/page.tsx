@@ -235,9 +235,14 @@ export default function SessionPage() {
                     })}
                   />
                 </span>
-                <button type="button" className="btn soft covered-btn" disabled={covered} onClick={() => setTopicIds((l) => toggle(l, x.id, true))}>
-                  {covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
-                </button>
+                <div className="covered-wrap">
+                  <button type="button" className="btn soft covered-btn" disabled={covered} onClick={() => setTopicIds((l) => toggle(l, x.id, true))}>
+                    {covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
+                  </button>
+                  {covered && (
+                    <span className="covered-by">by {(locked ? last?.trainer : undefined) || trainer || firstTrainer(c)}</span>
+                  )}
+                </div>
               </div>
               );
             })}

@@ -64,7 +64,9 @@ html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avata
 .tdet-checks label{display:flex;gap:8px;align-items:flex-start;cursor:pointer;text-transform:none!important}
 .tdet-checks input{margin-top:3px;accent-color:#3158b6}
 .topic-choice.is-covered{opacity:.6;background:#f4f6fa}
-.topic-choice .covered-btn{margin-left:auto;align-self:flex-start;white-space:nowrap;flex:none}
+.topic-choice .covered-wrap{margin-left:auto;align-self:flex-start;display:flex;align-items:center;gap:10px;flex:none}
+.topic-choice .covered-by{font-size:12px;font-weight:600;color:#168767;white-space:nowrap;text-transform:none!important}
+.topic-choice .covered-btn{white-space:nowrap;flex:none}
 .topic-choice .covered-btn:disabled{cursor:not-allowed;opacity:.7}
 .tdet-block.act li:before{background:#168767;box-shadow:0 0 0 3px #1687671a}
 
