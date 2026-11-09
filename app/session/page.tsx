@@ -20,6 +20,7 @@ export default function SessionPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [attendeeQ, setAttendeeQ] = useState('');
   const [topicQ, setTopicQ] = useState('');
+  const [points, setPoints] = useState<Set<string>>(new Set());
   const picker = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export default function SessionPage() {
     setAttendeeQ('');
     setTopicQ('');
     setTopicIds([]);
+    setPoints(new Set());
     setUpdateExisting(false);
     setTraineeIds([]);
   };
@@ -195,7 +197,12 @@ export default function SessionPage() {
           <SectionTitle
             title="3 · Topics covered"
             sub="Every checked topic will be marked for all selected trainees above."
-            right={<button className="btn soft" onClick={() => setTopicIds(c.topics.map((t) => t.id))}>Select all topics</button>}
+            right={
+              <span style={{ display: 'flex', gap: 8 }}>
+                <button className="btn" onClick={() => setTopicIds([])}>Clear</button>
+                <button className="btn soft" onClick={() => setTopicIds(c.topics.map((t) => t.id))}>Select all topics</button>
+              </span>
+            }
           />
           <input className="input" style={{ width: '100%', marginBottom: 10 }} type="search" placeholder="Search topics…" aria-label="Search topics" value={topicQ} onChange={(e) => setTopicQ(e.target.value)} />
           <div className="choice-list topic-choices">
@@ -204,9 +211,9 @@ export default function SessionPage() {
               const locked = lockedTopic(x.id);
               const doneN = [...selected].filter((tid) => doneBy(tid, x.id)?.done).length;
               const last = [...selected].map((tid) => doneBy(tid, x.id)).find((r) => r?.done);
+              const covered = locked || chosen.has(x.id);
               return (
-              <label className="choice topic-choice" key={x.id}>
-                <input type="checkbox" checked={locked || chosen.has(x.id)} disabled={locked} onChange={(e) => setTopicIds((l) => toggle(l, x.id, e.target.checked))} />
+              <div className={`choice topic-choice${covered ? ' is-covered' : ''}`} key={x.id} aria-disabled={covered}>
                 <span>
                   <b>{x.topic}</b>
                   <small>{x.day}{x.category ? ` · ${x.category}` : ''}</small>
@@ -216,9 +223,27 @@ export default function SessionPage() {
                       {last?.trainer ? ` by ${last.trainer}` : ''}{last?.date ? ` on ${fmtDate(last.date)}` : ''}
                     </small>
                   )}
-                  <TopicDetails cover={x.cover} activity={x.activity} />
+                  <TopicDetails
+                    cover={x.cover}
+                    activity={x.activity}
+                    disabled={covered}
+                    checked={new Set([...points].filter((k) => k.startsWith(`${x.id}:`)).map((k) => Number(k.split(':')[1])))}
+                    onCheck={(i, on) => setPoints((p) => {
+                      const n = new Set(p);
+                      on ? n.add(`${x.id}:${i}`) : n.delete(`${x.id}:${i}`);
+                      return n;
+                    })}
+                  />
                 </span>
-              </label>
+                <div className="covered-wrap">
+                  <button type="button" className="btn soft covered-btn" disabled={covered} onClick={() => setTopicIds((l) => toggle(l, x.id, true))}>
+                    {covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
+                  </button>
+                  {covered && (
+                    <span className="covered-by">by {(locked ? last?.trainer : undefined) || trainer || firstTrainer(c)}</span>
+                  )}
+                </div>
+              </div>
               );
             })}
           </div>

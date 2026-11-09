@@ -59,6 +59,15 @@ html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avata
 .tdet ul{list-style:none;margin:7px 0 0;padding:0;display:grid;gap:5px}
 .tdet li{position:relative;padding-left:17px;font-size:12px;line-height:1.55;color:#4a5870;font-weight:500}
 .tdet li:before{content:'';position:absolute;left:3px;top:.62em;width:6px;height:6px;border-radius:50%;background:#3158b6;box-shadow:0 0 0 3px #3158b61a}
+.tdet ul.tdet-checks li{padding-left:0}
+.tdet ul.tdet-checks li:before{display:none}
+.tdet-checks label{display:flex;gap:8px;align-items:flex-start;cursor:pointer;text-transform:none!important}
+.tdet-checks input{margin-top:3px;accent-color:#3158b6}
+.topic-choice.is-covered{opacity:.6;background:#f4f6fa}
+.topic-choice .covered-wrap{margin-left:auto;align-self:flex-start;display:flex;align-items:center;gap:10px;flex:none}
+.topic-choice .covered-by{font-size:12px;font-weight:600;color:#168767;white-space:nowrap;text-transform:none!important}
+.topic-choice .covered-btn{white-space:nowrap;flex:none}
+.topic-choice .covered-btn:disabled{cursor:not-allowed;opacity:.7}
 .tdet-block.act li:before{background:#168767;box-shadow:0 0 0 3px #1687671a}
 
 /* Title Case for headings, column headers, section labels and buttons (data cells are left as typed) */
