@@ -14,7 +14,20 @@ const bullets = (v?: string) =>
     .filter(Boolean);
 
 /** "What we cover" and "Activity" as two labelled bullet lists. */
-export function TopicDetails({ cover, activity }: { cover?: string; activity?: string }) {
+export function TopicDetails({
+  cover,
+  activity,
+  checked,
+  onCheck,
+  disabled,
+}: {
+  cover?: string;
+  activity?: string;
+  /** When set, "What we cover" points render with checkboxes (indexes of ticked points). */
+  checked?: Set<number>;
+  onCheck?: (index: number, on: boolean) => void;
+  disabled?: boolean;
+}) {
   const c = bullets(cover);
   const a = bullets(activity);
   if (!c.length && !a.length) return null;
@@ -23,7 +36,20 @@ export function TopicDetails({ cover, activity }: { cover?: string; activity?: s
       {c.length > 0 && (
         <div className="tdet-block">
           <span className="tdet-h">What we cover</span>
-          <ul>{c.map((x, i) => <li key={i}>{x}</li>)}</ul>
+          {checked && onCheck ? (
+            <ul className="tdet-checks">
+              {c.map((x, i) => (
+                <li key={i}>
+                  <label>
+                    <input type="checkbox" checked={disabled || checked.has(i)} disabled={disabled} onChange={(e) => onCheck(i, e.target.checked)} />
+                    <span>{x}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul>{c.map((x, i) => <li key={i}>{x}</li>)}</ul>
+          )}
         </div>
       )}
       {a.length > 0 && (
