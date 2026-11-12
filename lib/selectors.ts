@@ -47,13 +47,13 @@ export function learners(S: State): Trainee[] {
 export const traineeById = (S: State, id: string) => learners(S).find((t) => t.id === id);
 
 /** Whoever sat an assessment: an enrolled trainee, a trainer or an admin. */
-export const examTakerById = (S: State, id: string): { id: string; name: string; tone: string; role: 'Trainee' | 'Trainer' | 'Admin' } | undefined => {
+export const examTakerById = (S: State, id: string): { id: string; name: string; email: string; tone: string; role: 'Trainee' | 'Trainer' | 'Admin' } | undefined => {
   const t = learners(S).find((x) => x.id === id);
-  if (t) return { id: t.id, name: t.name, tone: t.tone, role: 'Trainee' };
+  if (t) return { id: t.id, name: t.name, email: t.email, tone: t.tone, role: 'Trainee' };
   const r = S.trainers.find((x) => x.id === id);
-  if (r) return { id: r.id, name: r.name, tone: r.tone, role: 'Trainer' };
+  if (r) return { id: r.id, name: r.name, email: r.email, tone: r.tone, role: 'Trainer' };
   const ad = S.admins.find((x) => x.id === id);
-  return ad ? { id: ad.id, name: ad.name, tone: '', role: 'Admin' } : undefined;
+  return ad ? { id: ad.id, name: ad.name, email: ad.email, tone: '', role: 'Admin' } : undefined;
 };
 
 export const orderedTopics = (c: Course): Topic[] =>

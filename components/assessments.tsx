@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
 import type { Assessment, AssessmentAssign, Question } from '@/lib/types';
-import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES } from '@/lib/csv';
+import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES, slug } from '@/lib/csv';
 import { uid } from '@/lib/util';
 import { examTakerById } from '@/lib/selectors';
 import { FormActions } from './ui';
@@ -61,7 +61,6 @@ export function AssessmentForm({ id }: { id?: string }) {
   const [description, setDescription] = useState(ex?.description ?? '');
   const [qs, setQs] = useState<Question[]>(ex?.questions.length ? ex.questions : [blank()]);
   const file = useRef<HTMLInputElement>(null);
-  const keyFile = useRef<HTMLInputElement>(null);
   const total = qs.reduce((n, q) => n + (q.marks > 0 ? q.marks : 0), 0);
 
   const setQ = (i: number, patch: Partial<Question>) => setQs((p) => p.map((q, j) => (j === i ? { ...q, ...patch } : q)));
@@ -74,25 +73,26 @@ export function AssessmentForm({ id }: { id?: string }) {
     toast(`${questions.length} ${questions.length === 1 ? 'question' : 'questions'} imported${skipped ? `, ${skipped} skipped` : ''}`);
   };
 
-  /** Sets the correct answer of questions already in the form from a CSV (Question or Q No, plus Correct Answer). */
-  const importKey = async (f: File) => {
-    const rows = parseCSV(await f.text());
-    const next = qs.map((q) => ({ ...q }));
-    let updated = 0;
-    let skipped = 0;
-    rows.forEach((r, n) => {
-      const text = (field(r, 'Question') ?? '').trim().toLowerCase();
-      const no = Number((field(r, 'Q No', 'No', 'Question No', 'S No') ?? '').replace(/\D/g, ''));
-      const found = (text && next.find((x) => x.text.trim().toLowerCase() === text)) || (no ? next[no - 1] : !text ? next[n] : undefined);
-      const q = found && !isWritten(found) ? found : undefined;
-      const i = q ? choiceIndex(field(r, 'Correct Answer', 'Answer') ?? '', q.options) : -1;
-      if (!q || i < 0 || !q.options[i]?.trim()) return void skipped++;
-      q.answer = i;
-      updated++;
+  /** Downloads the answer sheet of everyone who has sat this assessment: their answers, score and feedback, under an answer-key row. */
+  const exportExam = () => {
+    if (!ex) return;
+    const done = S.assessmentAssigns.filter((r) => r.assessmentId === ex.id && r.status === 'submitted');
+    if (!done.length) return toast('Nobody has submitted this exam yet');
+    const letter = (i: number) => String.fromCharCode(65 + i);
+    const cell = (q: Question, v: number | string | undefined) =>
+      isWritten(q) ? (typeof v === 'string' ? v : '') : typeof v === 'number' && q.options[v] !== undefined ? `${letter(v)}. ${q.options[v]}` : '';
+    const head = ['Name', 'Email', 'Role', 'Submitted', 'Score', 'Total', 'Percent', ...ex.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`])), 'Feedback'];
+    const key = ['ANSWER KEY', '', '', '', '', String(maxMarks(ex)), '', ...ex.questions.flatMap((q) => (isWritten(q) ? [q.text, String(q.marks)] : [cell(q, q.answer)])), ''];
+    const rows = done.map((r) => {
+      const p = examTakerById(S, r.traineeId);
+      return [
+        p?.name ?? 'Unknown', p?.email ?? '', p?.role ?? '', r.submittedAt ? r.submittedAt.slice(0, 10) : '', r.score ?? '', r.total ?? maxMarks(ex), `${percent(r)}%`,
+        ...ex.questions.flatMap((q) => (isWritten(q) ? [cell(q, r.answers[q.id]), r.writtenMarks?.[q.id] ?? ''] : [cell(q, r.answers[q.id])])),
+        r.feedback ?? '',
+      ];
     });
-    if (!updated) return toast('No answers matched the questions in this assessment');
-    setQs(next);
-    toast(`${updated} ${updated === 1 ? 'answer' : 'answers'} updated${skipped ? `, ${skipped} skipped` : ''}`);
+    downloadCSV([head, key, ...rows], `${slug(ex.title) || 'exam'}-answer-sheet.csv`);
+    toast(`Exported ${done.length} answer ${done.length === 1 ? 'sheet' : 'sheets'}`);
   };
 
   const submit = (e: FormEvent) => {
@@ -152,11 +152,10 @@ export function AssessmentForm({ id }: { id?: string }) {
           <div className="actions">
             <button type="button" className="btn soft" onClick={() => downloadCSV([QUESTION_COLUMNS, ...QUESTION_SAMPLES], 'evoluz-assessment-template.csv')}>⇩ Template</button>
             <button type="button" className="btn soft" onClick={() => file.current?.click()}>↑ Import questions</button>
-            <button type="button" className="btn soft" title="Upload a CSV with Question (or Q No) and Correct Answer to set the answers of the questions below" onClick={() => keyFile.current?.click()}>↑ Import answers</button>
+            <button type="button" className="btn soft" disabled={!ex} title={ex ? 'Download the answer sheet of everyone who has submitted this exam' : 'Save the assessment first'} onClick={exportExam}>⇩ Export Exam</button>
           </div>
         </div>
         <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importFile(f); }} />
-        <input ref={keyFile} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importKey(f); }} />
 
         <div style={{ display: 'grid', gap: 12 }}>
           {qs.map((q, i) => (
