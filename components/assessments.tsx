@@ -13,7 +13,9 @@ export const durationLabel = (m: number) => `${Math.floor(m / 60)} hr${m % 60 ? 
 export const maxMarks = (a: Assessment) => a.questions.reduce((n, q) => n + q.marks, 0);
 export const percent = (r: AssessmentAssign) => (r.total ? Math.round(((r.score ?? 0) / r.total) * 100) : 0);
 
-const blank = (): Question => ({ id: uid('q-'), text: '', options: ['', '', '', ''], answer: 0, marks: 1 });
+const blank = (kind: 'mcq' | 'written' = 'mcq'): Question =>
+  kind === 'written' ? { id: uid('q-'), text: '', options: [], answer: -1, marks: 5, kind } : { id: uid('q-'), text: '', options: ['', '', '', ''], answer: 0, marks: 1, kind };
+export const isWritten = (q: Question) => q.kind === 'written';
 
 /** Reads a chosen option from a cell: a letter (A-F), a 1-based number, or the option's own text. -1 when it cannot be read. */
 const choiceIndex = (raw: string, options: string[]) => {
@@ -30,6 +32,13 @@ function fromCSV(text: string): { questions: Question[]; skipped: number } {
   let skipped = 0;
   for (const r of rows) {
     const q = (field(r, 'Question') ?? '').trim();
+    const type = (field(r, 'Type') ?? '').trim().toLowerCase();
+    const marksCell = Number(field(r, 'Marks', 'Mark')) || 1;
+    if (type.startsWith('w') || type === 'essay' || type === 'descriptive') {
+      if (!q || marksCell < 1) skipped++;
+      else questions.push({ id: uid('q-'), text: q, options: [], answer: -1, marks: Math.round(marksCell), kind: 'written' });
+      continue;
+    }
     const options = ['Option A', 'Option B', 'Option C', 'Option D', 'Option E', 'Option F'].map((k) => (field(r, k) ?? '').trim()).filter(Boolean);
     const raw = (field(r, 'Correct Answer', 'Answer') ?? '').trim();
     const answer = choiceIndex(raw, options);
@@ -38,7 +47,7 @@ function fromCSV(text: string): { questions: Question[]; skipped: number } {
       skipped++;
       continue;
     }
-    questions.push({ id: uid('q-'), text: q, options, answer, marks: Math.round(marks) });
+    questions.push({ id: uid('q-'), text: q, options, answer, marks: Math.round(marks), kind: 'mcq' });
   }
   return { questions, skipped };
 }
@@ -74,7 +83,8 @@ export function AssessmentForm({ id }: { id?: string }) {
     rows.forEach((r, n) => {
       const text = (field(r, 'Question') ?? '').trim().toLowerCase();
       const no = Number((field(r, 'Q No', 'No', 'Question No', 'S No') ?? '').replace(/\D/g, ''));
-      const q = (text && next.find((x) => x.text.trim().toLowerCase() === text)) || (no ? next[no - 1] : !text ? next[n] : undefined);
+      const found = (text && next.find((x) => x.text.trim().toLowerCase() === text)) || (no ? next[no - 1] : !text ? next[n] : undefined);
+      const q = found && !isWritten(found) ? found : undefined;
       const i = q ? choiceIndex(field(r, 'Correct Answer', 'Answer') ?? '', q.options) : -1;
       if (!q || i < 0 || !q.options[i]?.trim()) return void skipped++;
       q.answer = i;
@@ -90,6 +100,8 @@ export function AssessmentForm({ id }: { id?: string }) {
     const clean = qs.filter((q) => q.text.trim());
     if (!clean.length) return toast('Add at least one question');
     for (const q of clean) {
+      if (!(q.marks > 0)) return toast('Marks must be at least 1');
+      if (isWritten(q)) continue;
       const opts = q.options.filter((o) => o.trim());
       if (opts.length < 2) return toast('Each question needs at least two options');
       if (!q.options[q.answer]?.trim()) return toast('Mark a filled-in option as the correct answer');
@@ -97,8 +109,9 @@ export function AssessmentForm({ id }: { id?: string }) {
     }
     // drop empty options but keep the correct answer pointing at the same text
     const questions = clean.map((q) => {
+      if (isWritten(q)) return { ...q, text: q.text.trim(), options: [], answer: -1, marks: Math.round(q.marks), kind: 'written' as const };
       const keep = q.options.map((o, i) => ({ o: o.trim(), i })).filter((x) => x.o);
-      return { ...q, text: q.text.trim(), options: keep.map((x) => x.o), answer: keep.findIndex((x) => x.i === q.answer), marks: Math.round(q.marks) };
+      return { ...q, text: q.text.trim(), options: keep.map((x) => x.o), answer: keep.findIndex((x) => x.i === q.answer), marks: Math.round(q.marks), kind: 'mcq' as const };
     });
     update((s) => {
       const rec: Assessment = { id: ex?.id ?? uid('asm-'), courseId, title: title.trim(), description: description.trim(), durationMin: duration, createdBy: ex?.createdBy || me?.name || '', questions };
@@ -150,10 +163,14 @@ export function AssessmentForm({ id }: { id?: string }) {
             <div key={q.id} className="card" style={{ padding: 12 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <b style={{ fontSize: 12 }}>Q{i + 1}</b>
+                <span className={`pill ${isWritten(q) ? 'progress' : 'neutral'}`}>{isWritten(q) ? 'Written' : 'MCQ'}</span>
                 <input style={{ flex: 1 }} value={q.text} onChange={(e) => setQ(i, { text: e.target.value })} placeholder="Question" />
                 <input type="number" min={1} style={{ width: 70 }} value={q.marks} onChange={(e) => setQ(i, { marks: Number(e.target.value) })} aria-label="Marks" title="Marks" />
                 <button type="button" className="btn" onClick={() => setQs((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : [blank()]))} aria-label="Remove question">✕</button>
               </div>
+              {isWritten(q) ? (
+                <small className="subtle" style={{ display: 'block', marginTop: 8 }}>Written answer: the trainee types a response and staff give marks (up to {q.marks}) in the result review.</small>
+              ) : (
               <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                 {q.options.map((o, k) => (
                   <label key={k} style={{ display: 'flex', gap: 8, alignItems: 'center', textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
@@ -163,10 +180,12 @@ export function AssessmentForm({ id }: { id?: string }) {
                   </label>
                 ))}
               </div>
+              )}
             </div>
           ))}
         </div>
-        <button type="button" className="btn soft" style={{ marginTop: 10 }} onClick={() => setQs((p) => [...p, blank()])}>＋ Add question</button>
+        <button type="button" className="btn soft" style={{ marginTop: 10 }} onClick={() => setQs((p) => [...p, blank()])}>＋ Add multiple-choice question</button>{' '}
+        <button type="button" className="btn soft" style={{ marginTop: 10 }} onClick={() => setQs((p) => [...p, blank('written')])}>＋ Add written question</button>
         <small className="subtle" style={{ display: 'block', marginTop: 6 }}>Pick the round button beside the correct option. Marks are in the small box on each question.</small>
         <FormActions onCancel={closeModal} save={ex ? 'Save changes' : 'Create assessment'} />
       </form>
@@ -174,13 +193,39 @@ export function AssessmentForm({ id }: { id?: string }) {
   );
 }
 
-/** The trainee's answers next to the correct ones. */
+/** Marks a result is worth: multiple-choice by key plus the marks staff gave written answers. */
+export const resultScore = (a: Assessment, answers: Record<string, number | string>, written: Record<string, number> = {}) =>
+  a.questions.reduce((n, q) => n + (isWritten(q) ? Math.min(q.marks, Math.max(0, Number(written[q.id]) || 0)) : answers[q.id] === q.answer ? q.marks : 0), 0);
+
+/** The trainee's answers next to the correct ones; written answers are marked here. */
 export function ResultReview({ assignId }: { assignId: string }) {
-  const { S, closeModal } = usePortal();
+  const { S, closeModal, update, toast } = usePortal();
   const r = S.assessmentAssigns.find((a) => a.id === assignId);
   const a = r && S.assessments.find((x) => x.id === r.assessmentId);
+  const [marks, setMarks] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(r?.writtenMarks ?? {}).map(([k, v]) => [k, String(v)])));
   if (!r || !a) return <p>Not found.</p>;
   const who = traineeById(S, r.traineeId)?.name ?? 'Trainee';
+  const hasWritten = a.questions.some(isWritten);
+
+  const saveMarks = () => {
+    const given: Record<string, number> = {};
+    for (const q of a.questions.filter(isWritten)) {
+      const raw = (marks[q.id] ?? '').trim();
+      if (!raw) continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0 || n > q.marks) return toast(`Marks for a written answer must be between 0 and ${q.marks}`);
+      given[q.id] = n;
+    }
+    update((st) => {
+      const rec = st.assessmentAssigns.find((x) => x.id === r.id);
+      if (!rec) return;
+      rec.writtenMarks = given;
+      rec.score = resultScore(a, rec.answers, given);
+      rec.total = maxMarks(a);
+    });
+    toast('Marks saved');
+  };
+
   return (
     <>
       <h2>{a.title}</h2>
@@ -188,6 +233,21 @@ export function ResultReview({ assignId }: { assignId: string }) {
       <div style={{ display: 'grid', gap: 10 }}>
         {a.questions.map((q, i) => {
           const pick = r.answers[q.id];
+          if (isWritten(q)) {
+            const given = r.writtenMarks?.[q.id];
+            return (
+              <div key={q.id} className="card" style={{ padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <b style={{ fontSize: 12 }}>Q{i + 1}. {q.text} <span className="pill progress">Written</span></b>
+                  <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+                    <input type="number" min={0} max={q.marks} step={1} style={{ width: 64 }} value={marks[q.id] ?? ''} placeholder="–" aria-label={`Marks for Q${i + 1}`} onChange={(e) => setMarks((m) => ({ ...m, [q.id]: e.target.value }))} /> / {q.marks}
+                  </span>
+                </div>
+                <p style={{ margin: '8px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>{typeof pick === 'string' && pick.trim() ? pick : <span className="subtle">Not answered</span>}</p>
+                {given === undefined && <small className="subtle">Not marked yet</small>}
+              </div>
+            );
+          }
           const ok = pick === q.answer;
           return (
             <div key={q.id} className="card" style={{ padding: 12 }}>
@@ -207,7 +267,10 @@ export function ResultReview({ assignId }: { assignId: string }) {
           );
         })}
       </div>
-      <div className="modal-actions"><button className="btn" onClick={closeModal}>Close</button></div>
+      <div className="modal-actions">
+        {hasWritten && <button className="btn primary" onClick={saveMarks}>Save marks</button>}
+        <button className="btn" onClick={closeModal}>Close</button>
+      </div>
     </>
   );
 }
@@ -219,9 +282,14 @@ export function ImportResultsForm({ id }: { id: string }) {
   const a = S.assessments.find((x) => x.id === id);
   if (!a) return <p>Not found.</p>;
 
+  // columns: Email, Name, then Q1.. (a letter for multiple choice, the typed text for written) and "Qn Marks" after each written question
+  const columns = ['Email', 'Name', ...a.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`]))];
   const template = () =>
     downloadCSV(
-      [['Email', 'Name', ...a.questions.map((_, i) => `Q${i + 1}`)], ['asha.verma@evoluz.tech', 'Asha Verma', ...a.questions.map((q, i) => String.fromCharCode(65 + (i % q.options.length)))]],
+      [
+        columns,
+        ['asha.verma@evoluz.tech', 'Asha Verma', ...a.questions.flatMap((q, i) => (isWritten(q) ? ['Typed answer goes here', String(Math.max(0, q.marks - 1))] : [String.fromCharCode(65 + (i % Math.max(1, q.options.length)))]))],
+      ],
       `${slug(a.title) || 'assessment'}-answers-template.csv`
     );
 
@@ -229,7 +297,7 @@ export function ImportResultsForm({ id }: { id: string }) {
     const rows = parseCSV(await f.text());
     if (!rows.length) return toast('No rows found in that file');
     const people = learners(S);
-    const results: { traineeId: string; answers: Record<string, number>; score: number }[] = [];
+    const results: { traineeId: string; answers: Record<string, number | string>; written: Record<string, number> }[] = [];
     const problems: string[] = [];
     const seen = new Set<string>();
     rows.forEach((r, n) => {
@@ -241,24 +309,30 @@ export function ImportResultsForm({ id }: { id: string }) {
       if (!isAssigned(S, t.id, a.courseId)) return void problems.push(`${t.name}: not assigned to this course`);
       if (seen.has(t.id)) return void problems.push(`${t.name}: listed twice`);
       if (S.assessmentAssigns.some((x) => x.assessmentId === a.id && x.traineeId === t.id && x.status === 'submitted')) return void problems.push(`${t.name}: already submitted`);
-      const answers: Record<string, number> = {};
-      let score = 0;
+      const answers: Record<string, number | string> = {};
+      const written: Record<string, number> = {};
       a.questions.forEach((q, i) => {
-        const k = choiceIndex(field(r, `Q${i + 1}`) ?? '', q.options);
-        if (k < 0) return;
-        answers[q.id] = k;
-        if (k === q.answer) score += q.marks;
+        const cell = field(r, `Q${i + 1}`) ?? '';
+        if (isWritten(q)) {
+          if (!cell.trim()) return;
+          answers[q.id] = cell.trim();
+          const m = (field(r, `Q${i + 1} Marks`) ?? '').trim();
+          if (m !== '' && Number.isFinite(Number(m))) written[q.id] = Math.min(q.marks, Math.max(0, Math.round(Number(m))));
+          return;
+        }
+        const k = choiceIndex(cell, q.options);
+        if (k >= 0) answers[q.id] = k;
       });
       if (!Object.keys(answers).length) return void problems.push(`${t.name}: no readable answers`);
       seen.add(t.id);
-      results.push({ traineeId: t.id, answers, score });
+      results.push({ traineeId: t.id, answers, written });
     });
     if (!results.length) return toast(problems[0] ? `Nothing imported. ${problems[0]}` : 'Nothing imported');
     const at = new Date().toISOString();
     update((s) => {
       for (const x of results) {
         const rec = s.assessmentAssigns.find((r) => r.assessmentId === a.id && r.traineeId === x.traineeId);
-        const done = { status: 'submitted' as const, startedAt: at, submittedAt: at, score: x.score, total: maxMarks(a), answers: x.answers };
+        const done = { status: 'submitted' as const, startedAt: at, submittedAt: at, score: resultScore(a, x.answers, x.written), total: maxMarks(a), answers: x.answers, writtenMarks: x.written };
         if (rec) Object.assign(rec, done);
         else s.assessmentAssigns.push({ id: uid('aa-'), assessmentId: a.id, traineeId: x.traineeId, assignedOn: today(), due: '', ...done });
       }
@@ -267,10 +341,16 @@ export function ImportResultsForm({ id }: { id: string }) {
     closeModal();
   };
 
+  const hasWritten = a.questions.some(isWritten);
   return (
     <>
       <h2>Import answers</h2>
-      <p>{a.title}. Upload a CSV with one row per trainee: their <b>Email</b> (or Name) and the option they chose for each question in columns <b>Q1</b> to <b>Q{a.questions.length}</b> (A, B, C… or the option text). Answers are scored with the answer key and added to the Assessment report as submitted. Trainees who already submitted are skipped.</p>
+      <p>
+        {a.title}. Upload a CSV with one row per trainee: their <b>Email</b> (or Name) and one column per question, <b>Q1</b> to <b>Q{a.questions.length}</b>.
+        For multiple choice use A, B, C… or the option text.
+        {hasWritten && <> For written questions put the typed answer in the <b>Qn</b> column and the marks given in <b>Qn Marks</b>.</>}
+        {' '}Results are scored with the answer key and added to the Assessment report as submitted. Trainees who already submitted are skipped.
+      </p>
       <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void run(f); }} />
       <div className="modal-actions">
         <button type="button" className="btn" onClick={closeModal}>Cancel</button>

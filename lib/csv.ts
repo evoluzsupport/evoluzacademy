@@ -95,8 +95,10 @@ export const TEMPLATE_COLUMNS: Record<ImportKind, string[]> = {
   topics: ['Course', 'Planned Day', 'Trainer Name', 'Category', 'Training Topic', 'What We Cover', 'Practical Activity / Assessment'],
 };
 
-export const QUESTION_COLUMNS = ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer', 'Marks'];
+/** Type is MCQ or Written. A written question has no options or correct answer; staff mark the typed answer out of Marks. */
+export const QUESTION_COLUMNS = ['Question', 'Type', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer', 'Marks'];
 export const QUESTION_SAMPLES = [
-  ['Which Zoho app tracks projects and tasks?', 'Zoho Projects', 'Zoho Books', 'Zoho Vault', 'Zoho Meeting', 'A', '2'],
-  ['What does MFA stand for?', 'Managed File Access', 'Multi-Factor Authentication', 'Master Form Approval', 'Multiple Folder Access', 'B', '2'],
+  ['Which Zoho app tracks projects and tasks?', 'MCQ', 'Zoho Projects', 'Zoho Books', 'Zoho Vault', 'Zoho Meeting', 'A', '2'],
+  ['What does MFA stand for?', 'MCQ', 'Managed File Access', 'Multi-Factor Authentication', 'Master Form Approval', 'Multiple Folder Access', 'B', '2'],
+  ['A client sends a six-page requirement document with unclear rules. Explain how you would handle it until the developer starts work.', 'Written', '', '', '', '', '', '10'],
 ];

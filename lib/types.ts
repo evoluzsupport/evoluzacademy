@@ -95,6 +95,8 @@ export interface Question {
   /** index of the correct option; -1 when the answer key is hidden (trainees never receive it) */
   answer: number;
   marks: number;
+  /** 'mcq' (default) is scored from the key; 'written' has a typed answer that staff mark */
+  kind?: 'mcq' | 'written';
 }
 export interface Assessment {
   id: string;
@@ -117,8 +119,10 @@ export interface AssessmentAssign {
   submittedAt: string;
   score: number | null;
   total: number | null;
-  /** question id to chosen option index */
-  answers: Record<string, number>;
+  /** question id to chosen option index (multiple choice) or the typed text (written) */
+  answers: Record<string, number | string>;
+  /** question id to the marks staff gave a written answer */
+  writtenMarks?: Record<string, number>;
 }
 export interface State {
   admins: Admin[];

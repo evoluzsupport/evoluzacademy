@@ -4,7 +4,7 @@ import { usePortal } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
 import { courseById } from '@/lib/selectors';
 import { Empty, Guard, PageHead, Pill } from '@/components/ui';
-import { durationLabel, maxMarks, percent } from '@/components/assessments';
+import { durationLabel, isWritten, maxMarks, percent } from '@/components/assessments';
 import { fmtDate } from '@/lib/util';
 import type { Assessment, AssessmentAssign } from '@/lib/types';
 
@@ -85,7 +85,7 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
   const { toast, refresh, confirm } = usePortal();
   const end = new Date(r.startedAt).getTime() + a.durationMin * 60000;
   const [left, setLeft] = useState(() => Math.round((end - Date.now()) / 1000));
-  const [answers, setAnswers] = useState<Record<string, number>>(() => {
+  const [answers, setAnswers] = useState<Record<string, number | string>>(() => {
     try {
       return JSON.parse(localStorage.getItem(draftKey(r.id)) || '{}');
     } catch {
@@ -95,7 +95,7 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
   const [sending, setSending] = useState(false);
   const sent = useRef(false);
 
-  const pick = (q: string, i: number) =>
+  const pick = (q: string, i: number | string) =>
     setAnswers((p) => {
       const n = { ...p, [q]: i };
       try {
@@ -130,7 +130,7 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
     if (left <= 0) void submit();
   }, [left, submit]);
 
-  const answered = a.questions.filter((q) => answers[q.id] !== undefined).length;
+  const answered = a.questions.filter((q) => (isWritten(q) ? String(answers[q.id] ?? '').trim() !== '' : answers[q.id] !== undefined)).length;
   return (
     <>
       <div className="card section-card" style={{ position: 'sticky', top: 0, zIndex: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -147,6 +147,14 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
               <b>Q{i + 1}. {q.text}</b>
               <span className="pill neutral">{q.marks} {q.marks === 1 ? 'mark' : 'marks'}</span>
             </div>
+            {isWritten(q) ? (
+              <textarea
+                style={{ width: '100%', minHeight: 130, marginTop: 10 }}
+                placeholder="Type your answer here"
+                value={String(answers[q.id] ?? '')}
+                onChange={(e) => pick(q.id, e.target.value)}
+              />
+            ) : (
             <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
               {q.options.map((o, k) => (
                 <label key={k} style={{ display: 'flex', gap: 10, alignItems: 'center', textTransform: 'none', letterSpacing: 0, fontWeight: 500, fontSize: 13, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, background: answers[q.id] === k ? '#eef3fe' : undefined }}>
@@ -154,6 +162,7 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
                 </label>
               ))}
             </div>
+            )}
           </section>
         ))}
       </div>
