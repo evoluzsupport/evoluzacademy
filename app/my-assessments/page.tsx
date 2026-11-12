@@ -55,6 +55,12 @@ export default function MyAssessmentsPage() {
                   <h3 style={{ margin: 0 }}>{a.title}</h3>
                   <small className="subtle">{courseById(S, a.courseId)?.name} · {a.questions.length} questions · {maxMarks(a)} marks · {durationLabel(a.durationMin)}{r.due ? ` · due ${fmtDate(r.due)}` : ''}</small>
                   {a.description && <p style={{ margin: '8px 0 0' }}>{a.description}</p>}
+                  {r.status === 'submitted' && r.feedback && (
+                    <div style={{ margin: '10px 0 0', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 8, background: '#f7f9fc' }}>
+                      <b style={{ fontSize: 12 }}>Feedback</b>
+                      <p style={{ margin: '4px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>{r.feedback}</p>
+                    </div>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   {r.status === 'submitted' ? (

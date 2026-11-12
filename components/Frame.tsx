@@ -44,6 +44,7 @@ const NAV: Record<Kind, { workspace: NavItem[]; insights: NavItem[]; assigned?: 
       { href: '/', label: 'Overview', icon: '⌂' },
       { href: '/trainees', label: 'My Trainee', icon: '♙' },
       { href: '/my-courses', label: 'Assigned Courses', icon: '▤' },
+      { href: '/my-assessments', label: 'My Assessments', icon: '✎' },
       { href: '/session', label: 'Log a session', icon: '＋' },
       { href: '/sessions', label: 'Session history', icon: '☰' },
       { href: '/calendar', label: 'Calendar', icon: '▦' },

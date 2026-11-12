@@ -3,9 +3,9 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
 import type { Assessment, AssessmentAssign, Question } from '@/lib/types';
-import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES, slug } from '@/lib/csv';
-import { today, uid } from '@/lib/util';
-import { isAssigned, learners, traineeById } from '@/lib/selectors';
+import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES } from '@/lib/csv';
+import { uid } from '@/lib/util';
+import { examTakerById } from '@/lib/selectors';
 import { FormActions } from './ui';
 
 export const DURATIONS = [60, 65, 70, 75, 80, 85, 90];
@@ -204,7 +204,7 @@ export function ResultReview({ assignId }: { assignId: string }) {
   const a = r && S.assessments.find((x) => x.id === r.assessmentId);
   const [marks, setMarks] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(r?.writtenMarks ?? {}).map(([k, v]) => [k, String(v)])));
   if (!r || !a) return <p>Not found.</p>;
-  const who = traineeById(S, r.traineeId)?.name ?? 'Trainee';
+  const who = examTakerById(S, r.traineeId)?.name ?? 'Trainee';
   const hasWritten = a.questions.some(isWritten);
 
   const saveMarks = () => {
@@ -230,6 +230,12 @@ export function ResultReview({ assignId }: { assignId: string }) {
     <>
       <h2>{a.title}</h2>
       <p>{who} · scored <b>{r.score ?? 0}/{r.total ?? maxMarks(a)}</b> ({percent(r)}%)</p>
+      {r.feedback && (
+        <div className="card" style={{ padding: 12, marginBottom: 10 }}>
+          <b style={{ fontSize: 12 }}>Feedback</b>
+          <p style={{ margin: '6px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>{r.feedback}</p>
+        </div>
+      )}
       <div style={{ display: 'grid', gap: 10 }}>
         {a.questions.map((q, i) => {
           const pick = r.answers[q.id];
@@ -275,88 +281,77 @@ export function ResultReview({ assignId }: { assignId: string }) {
   );
 }
 
-/** Upload what each trainee chose (one row per trainee); answers are scored against the answer key and saved as submitted results. */
-export function ImportResultsForm({ id }: { id: string }) {
+/** Give the score and written feedback to someone who sat the assessment. */
+export function FeedbackForm({ id }: { id: string }) {
   const { S, update, closeModal, toast } = usePortal();
-  const file = useRef<HTMLInputElement>(null);
   const a = S.assessments.find((x) => x.id === id);
+  const rows = S.assessmentAssigns.filter((r) => r.assessmentId === id).map((r) => ({ r, p: examTakerById(S, r.traineeId) })).filter((x) => x.p);
+  const [who, setWho] = useState(rows[0]?.r.id ?? '');
+  const cur = rows.find((x) => x.r.id === who)?.r;
+  const [score, setScore] = useState(cur?.status === 'submitted' && cur.score != null ? String(cur.score) : '');
+  const [text, setText] = useState(cur?.feedback ?? '');
   if (!a) return <p>Not found.</p>;
+  const max = maxMarks(a);
 
-  // columns: Email, Name, then Q1.. (a letter for multiple choice, the typed text for written) and "Qn Marks" after each written question
-  const columns = ['Email', 'Name', ...a.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`]))];
-  const template = () =>
-    downloadCSV(
-      [
-        columns,
-        ['asha.verma@evoluz.tech', 'Asha Verma', ...a.questions.flatMap((q, i) => (isWritten(q) ? ['Typed answer goes here', String(Math.max(0, q.marks - 1))] : [String.fromCharCode(65 + (i % Math.max(1, q.options.length)))]))],
-      ],
-      `${slug(a.title) || 'assessment'}-answers-template.csv`
-    );
+  const pickPerson = (rid: string) => {
+    const r = rows.find((x) => x.r.id === rid)?.r;
+    setWho(rid);
+    setScore(r?.status === 'submitted' && r.score != null ? String(r.score) : '');
+    setText(r?.feedback ?? '');
+  };
 
-  const run = async (f: File) => {
-    const rows = parseCSV(await f.text());
-    if (!rows.length) return toast('No rows found in that file');
-    const people = learners(S);
-    const results: { traineeId: string; answers: Record<string, number | string>; written: Record<string, number> }[] = [];
-    const problems: string[] = [];
-    const seen = new Set<string>();
-    rows.forEach((r, n) => {
-      const email = (field(r, 'Email') ?? '').trim().toLowerCase();
-      const name = (field(r, 'Name', 'Trainee') ?? '').trim().toLowerCase();
-      const t = people.find((p) => (email && p.email.toLowerCase() === email) || (!email && name && p.name.trim().toLowerCase() === name));
-      const label = email || name || `row ${n + 2}`;
-      if (!t) return void problems.push(`${label}: trainee not found`);
-      if (!isAssigned(S, t.id, a.courseId)) return void problems.push(`${t.name}: not assigned to this course`);
-      if (seen.has(t.id)) return void problems.push(`${t.name}: listed twice`);
-      if (S.assessmentAssigns.some((x) => x.assessmentId === a.id && x.traineeId === t.id && x.status === 'submitted')) return void problems.push(`${t.name}: already submitted`);
-      const answers: Record<string, number | string> = {};
-      const written: Record<string, number> = {};
-      a.questions.forEach((q, i) => {
-        const cell = field(r, `Q${i + 1}`) ?? '';
-        if (isWritten(q)) {
-          if (!cell.trim()) return;
-          answers[q.id] = cell.trim();
-          const m = (field(r, `Q${i + 1} Marks`) ?? '').trim();
-          if (m !== '' && Number.isFinite(Number(m))) written[q.id] = Math.min(q.marks, Math.max(0, Math.round(Number(m))));
-          return;
-        }
-        const k = choiceIndex(cell, q.options);
-        if (k >= 0) answers[q.id] = k;
-      });
-      if (!Object.keys(answers).length) return void problems.push(`${t.name}: no readable answers`);
-      seen.add(t.id);
-      results.push({ traineeId: t.id, answers, written });
-    });
-    if (!results.length) return toast(problems[0] ? `Nothing imported. ${problems[0]}` : 'Nothing imported');
-    const at = new Date().toISOString();
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!cur) return toast('Choose who took the exam');
+    const n = Number(score);
+    if (score.trim() === '' || !Number.isFinite(n) || n < 0 || n > max) return toast(`Score must be between 0 and ${max}`);
     update((s) => {
-      for (const x of results) {
-        const rec = s.assessmentAssigns.find((r) => r.assessmentId === a.id && r.traineeId === x.traineeId);
-        const done = { status: 'submitted' as const, startedAt: at, submittedAt: at, score: resultScore(a, x.answers, x.written), total: maxMarks(a), answers: x.answers, writtenMarks: x.written };
-        if (rec) Object.assign(rec, done);
-        else s.assessmentAssigns.push({ id: uid('aa-'), assessmentId: a.id, traineeId: x.traineeId, assignedOn: today(), due: '', ...done });
+      const rec = s.assessmentAssigns.find((x) => x.id === cur.id);
+      if (!rec) return;
+      rec.score = Math.round(n);
+      rec.total = max;
+      rec.feedback = text.trim();
+      if (rec.status !== 'submitted') {
+        const at = new Date().toISOString();
+        rec.status = 'submitted';
+        rec.startedAt = rec.startedAt || at;
+        rec.submittedAt = at;
       }
     });
-    toast(`${results.length} ${results.length === 1 ? 'result' : 'results'} imported${problems.length ? `, ${problems.length} skipped (${problems.slice(0, 2).join('; ')}${problems.length > 2 ? '…' : ''})` : ''}`);
+    toast('Score and feedback saved');
     closeModal();
   };
 
-  const hasWritten = a.questions.some(isWritten);
   return (
     <>
-      <h2>Import answers</h2>
-      <p>
-        {a.title}. Upload a CSV with one row per trainee: their <b>Email</b> (or Name) and one column per question, <b>Q1</b> to <b>Q{a.questions.length}</b>.
-        For multiple choice use A, B, C… or the option text.
-        {hasWritten && <> For written questions put the typed answer in the <b>Qn</b> column and the marks given in <b>Qn Marks</b>.</>}
-        {' '}Results are scored with the answer key and added to the Assessment report as submitted. Trainees who already submitted are skipped.
-      </p>
-      <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void run(f); }} />
-      <div className="modal-actions">
-        <button type="button" className="btn" onClick={closeModal}>Cancel</button>
-        <button type="button" className="btn soft" onClick={template}>⇩ Template</button>
-        <button type="button" className="btn primary" onClick={() => file.current?.click()}>↑ Choose CSV</button>
-      </div>
+      <h2>Feedback</h2>
+      <p>{a.title} · out of {max} marks. The score shows in the Assessment report and the feedback is shown to the person who took the exam.</p>
+      {!rows.length ? (
+        <>
+          <p className="subtle">This assessment has not been assigned to anyone yet. Use Assign first.</p>
+          <div className="modal-actions"><button type="button" className="btn" onClick={closeModal}>Close</button></div>
+        </>
+      ) : (
+        <form onSubmit={submit}>
+          <div className="form-grid">
+            <div className="field full">
+              <label>Exam taken by</label>
+              <select value={who} onChange={(e) => pickPerson(e.target.value)}>
+                {rows.map(({ r, p }) => <option key={r.id} value={r.id}>{p!.name} ({p!.role}){r.status === 'submitted' ? ` · ${r.score}/${r.total}` : ''}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Score (out of {max})</label>
+              <input type="number" min={0} max={max} step={1} value={score} onChange={(e) => setScore(e.target.value)} required placeholder={`0 – ${max}`} />
+            </div>
+            <div className="field full">
+              <label>Feedback</label>
+              <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write feedback for the person who took the exam" />
+            </div>
+          </div>
+          <FormActions onCancel={closeModal} save="Save feedback" />
+        </form>
+      )}
     </>
   );
 }

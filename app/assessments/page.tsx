@@ -1,9 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { usePortal } from '@/lib/store';
-import { courseById, isAssigned, learners, traineeById } from '@/lib/selectors';
+import { courseById, examTakerById, isAssigned, learners } from '@/lib/selectors';
 import { Avatar, Empty, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
-import { AssessmentForm, ImportResultsForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
+import { AssessmentForm, FeedbackForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
 import { fmtDate, today, uid } from '@/lib/util';
 
 type Tab = 'list' | 'assign' | 'report';
@@ -20,7 +20,7 @@ export default function AssessmentsPage() {
   const [tab, setTab] = useState<Tab>('list');
   const [pick, setPick] = useState('');
 
-  const sent = S.assessmentAssigns.filter((r) => traineeById(S, r.traineeId));
+  const sent = S.assessmentAssigns.filter((r) => examTakerById(S, r.traineeId));
 
   return (
     <Guard kinds={['admin']}>
@@ -63,7 +63,7 @@ export default function AssessmentsPage() {
                       <td>
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
                           <button className="btn soft" onClick={() => { setTab('assign'); setPick(a.id); }}>Assign</button>
-                          <button className="btn soft" onClick={() => openModal(<ImportResultsForm id={a.id} />)}>Import answers</button>
+                          <button className="btn soft" onClick={() => openModal(<FeedbackForm id={a.id} />)}>Feedback</button>
                           <button className="btn" onClick={() => openModal(<AssessmentForm id={a.id} />, true)}>Edit</button>
                           <button
                             className="btn"
@@ -101,18 +101,18 @@ function AssignTab({ initial }: { initial: string }) {
   const [aid, setAid] = useState(initial);
   const [chosen, setChosen] = useState<string[]>([]);
   const [due, setDue] = useState('');
+  const [who, setWho] = useState<'trainee' | 'trainer'>('trainee');
   const a = S.assessments.find((x) => x.id === aid);
 
-  // only trainees who have been given the assessment's course, and not this assessment already
-  const eligible = useMemo(
-    () =>
-      a
-        ? learners(S)
-            .filter((t) => isAssigned(S, t.id, a.courseId) && !S.assessmentAssigns.some((r) => r.assessmentId === a.id && r.traineeId === t.id))
-            .sort((x, y) => x.name.localeCompare(y.name))
-        : [],
-    [S, a]
-  );
+  // trainees must have been given the assessment's course; trainers can sit any assessment. Nobody gets the same one twice.
+  const eligible = useMemo(() => {
+    if (!a) return [];
+    const has = (id: string) => S.assessmentAssigns.some((r) => r.assessmentId === a.id && r.traineeId === id);
+    const pool: { id: string; name: string; tone: string }[] =
+      who === 'trainer' ? S.trainers : learners(S).filter((t) => isAssigned(S, t.id, a.courseId));
+    return pool.filter((t) => !has(t.id)).sort((x, y) => x.name.localeCompare(y.name));
+  }, [S, a, who]);
+  const noun = who === 'trainer' ? 'trainer' : 'trainee';
   const toggle = (id: string) => setChosen((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   const go = () => {
@@ -123,13 +123,13 @@ function AssignTab({ initial }: { initial: string }) {
       for (const t of chosen)
         s.assessmentAssigns.push({ id: uid('aa-'), assessmentId: a.id, traineeId: t, assignedOn: today(), due, status: 'assigned', startedAt: '', submittedAt: '', score: null, total: null, answers: {} });
     });
-    toast(`Assessment assigned to ${chosen.length} ${chosen.length === 1 ? 'trainee' : 'trainees'}`);
+    toast(`Assessment assigned to ${chosen.length} ${chosen.length === 1 ? noun : noun + 's'}`);
     setChosen([]);
   };
 
   return (
     <section className="card section-card">
-      <SectionTitle title="Assign assessment" sub="Trainees see it under My Assessments and take it in the time allowed" />
+      <SectionTitle title="Assign assessment" sub="They see it under My Assessments and take it in the time allowed" />
       <div className="form-grid" style={{ maxWidth: 640 }}>
         <div className="field full">
           <label>Assessment</label>
@@ -141,7 +141,17 @@ function AssignTab({ initial }: { initial: string }) {
         {a && (
           <>
             <div className="field full">
-              <label>Trainees on {courseById(S, a.courseId)?.name}</label>
+              <label>Who will take the exam?</label>
+              <div style={{ display: 'flex', gap: 18 }} role="radiogroup" aria-label="Who will take the exam">
+                {(['trainee', 'trainer'] as const).map((k) => (
+                  <label key={k} style={{ display: 'flex', gap: 6, alignItems: 'center', textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                    <input type="radio" name="exam-who" checked={who === k} onChange={() => { setWho(k); setChosen([]); }} /> {k === 'trainee' ? 'Trainee' : 'Trainer'}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="field full">
+              <label>{who === 'trainer' ? 'Trainers' : `Trainees on ${courseById(S, a.courseId)?.name}`}</label>
               {eligible.length ? (
                 <div style={{ border: '1px solid var(--line)', borderRadius: 10, maxHeight: 260, overflow: 'auto', padding: 6 }}>
                   <label style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 6, fontWeight: 700, textTransform: 'none', letterSpacing: 0 }}>
@@ -155,7 +165,7 @@ function AssignTab({ initial }: { initial: string }) {
                   ))}
                 </div>
               ) : (
-                <small className="subtle">Everyone assigned this course already has this assessment, or nobody has been given the course yet.</small>
+                <small className="subtle">{who === 'trainer' ? 'Every trainer already has this assessment.' : 'Everyone assigned this course already has this assessment, or nobody has been given the course yet.'}</small>
               )}
             </div>
             <div className="field"><label>Due date</label><input type="date" min={today()} value={due} onChange={(e) => setDue(e.target.value)} /></div>
@@ -164,7 +174,7 @@ function AssignTab({ initial }: { initial: string }) {
       </div>
       {a && (
         <div style={{ marginTop: 14 }}>
-          <button className="btn primary" onClick={go} disabled={!chosen.length}>Assign to {chosen.length || ''} {chosen.length === 1 ? 'trainee' : 'trainees'}</button>
+          <button className="btn primary" onClick={go} disabled={!chosen.length}>Assign to {chosen.length || ''} {chosen.length === 1 ? noun : noun + 's'}</button>
         </div>
       )}
     </section>
@@ -176,7 +186,7 @@ function ReportTab() {
   const [course, setCourse] = useState('');
   const [status, setStatus] = useState('');
   const rows = S.assessmentAssigns
-    .map((r) => ({ r, a: S.assessments.find((x) => x.id === r.assessmentId), t: traineeById(S, r.traineeId) }))
+    .map((r) => ({ r, a: S.assessments.find((x) => x.id === r.assessmentId), t: examTakerById(S, r.traineeId) }))
     .filter((x) => x.a && x.t && (!course || x.a.courseId === course) && (!status || x.r.status === status))
     .sort((x, y) => (y.r.submittedAt || y.r.assignedOn).localeCompare(x.r.submittedAt || x.r.assignedOn));
   const done = rows.filter((x) => x.r.status === 'submitted');
@@ -210,7 +220,7 @@ function ReportTab() {
             <tbody>
               {rows.map(({ r, a, t }) => (
                 <tr key={r.id}>
-                  <td><div className="person"><Avatar name={t!.name} tone={t!.tone} /><div>{t!.name}</div></div></td>
+                  <td><div className="person"><Avatar name={t!.name} tone={t!.tone} /><div>{t!.name}{t!.role !== 'Trainee' && <><br /><small className="subtle">{t!.role}</small></>}</div></div></td>
                   <td>{courseById(S, a!.courseId)?.name}</td>
                   <td>{a!.title}<br /><small className="subtle">Due {fmtDate(r.due)}</small></td>
                   <td><Pill kind={STATUS[r.status].kind}>{STATUS[r.status].label}</Pill></td>

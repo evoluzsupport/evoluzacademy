@@ -197,6 +197,7 @@ const TABLES: Table[] = [
         total: a.total,
         answers: a.answers,
         written_marks: a.writtenMarks ?? {},
+        feedback: a.feedback ?? '',
       })),
   },
 ];
@@ -399,6 +400,7 @@ export async function loadRemote(): Promise<State> {
       total: a.total == null ? null : Number(a.total),
       answers: (a.answers as Record<string, number | string> | null) ?? {},
       writtenMarks: (a.written_marks as Record<string, number> | null) ?? {},
+      feedback: str(a.feedback),
     })
   );
   return s;
