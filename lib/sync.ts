@@ -170,14 +170,14 @@ const TABLES: Table[] = [
     order: ['assessment_id', 'position'],
     rows: (s) =>
       s.assessments.flatMap((a) =>
-        a.questions.map((q, i) => ({ id: q.id, assessment_id: a.id, position: i, text: q.text, options: q.options, marks: q.marks }))
+        a.questions.map((q, i) => ({ id: q.id, assessment_id: a.id, position: i, text: q.text, options: q.options, marks: q.marks, kind: q.kind ?? 'mcq' }))
       ),
   },
   {
     name: 'assessment_keys',
     pk: ['question_id'],
     order: ['question_id'],
-    rows: (s) => s.assessments.flatMap((a) => a.questions.filter((q) => q.answer >= 0).map((q) => ({ question_id: q.id, answer: q.answer }))),
+    rows: (s) => s.assessments.flatMap((a) => a.questions.filter((q) => q.answer >= 0 && q.kind !== 'written').map((q) => ({ question_id: q.id, answer: q.answer }))),
   },
   {
     name: 'assessment_assignments',
@@ -196,6 +196,7 @@ const TABLES: Table[] = [
         score: a.score,
         total: a.total,
         answers: a.answers,
+        written_marks: a.writtenMarks ?? {},
       })),
   },
 ];
@@ -369,6 +370,7 @@ export async function loadRemote(): Promise<State> {
       options: Array.isArray(q.options) ? (q.options as unknown[]).map(str) : [],
       answer: keyOfQ.get(str(q.id)) ?? -1,
       marks: Number(q.marks) || 1,
+      kind: q.kind === 'written' ? 'written' : 'mcq',
     });
     qsOf.set(str(q.assessment_id), list);
   }
@@ -395,7 +397,8 @@ export async function loadRemote(): Promise<State> {
       submittedAt: str(a.submitted_at),
       score: a.score == null ? null : Number(a.score),
       total: a.total == null ? null : Number(a.total),
-      answers: (a.answers as Record<string, number> | null) ?? {},
+      answers: (a.answers as Record<string, number | string> | null) ?? {},
+      writtenMarks: (a.written_marks as Record<string, number> | null) ?? {},
     })
   );
   return s;
