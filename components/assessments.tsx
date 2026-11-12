@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
-import type { Assessment, AssessmentAssign, Question } from '@/lib/types';
+import type { Assessment, AssessmentAssign, Question, State } from '@/lib/types';
 import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES, slug } from '@/lib/csv';
 import { uid } from '@/lib/util';
 import { examTakerById } from '@/lib/selectors';
@@ -73,7 +73,7 @@ export function AssessmentForm({ id }: { id?: string }) {
     toast(`${questions.length} ${questions.length === 1 ? 'question' : 'questions'} imported${skipped ? `, ${skipped} skipped` : ''}`);
   };
 
-  /** Downloads the answer sheet of everyone who has sat this assessment: their answers, score and feedback, under an answer-key row. */
+  /** Downloads the answer sheet of everyone who has sat this assessment: their answers and score, under an answer-key row. */
   const exportExam = () => {
     if (!ex) return;
     const done = S.assessmentAssigns.filter((r) => r.assessmentId === ex.id && r.status === 'submitted');
@@ -81,14 +81,13 @@ export function AssessmentForm({ id }: { id?: string }) {
     const letter = (i: number) => String.fromCharCode(65 + i);
     const cell = (q: Question, v: number | string | undefined) =>
       isWritten(q) ? (typeof v === 'string' ? v : '') : typeof v === 'number' && q.options[v] !== undefined ? `${letter(v)}. ${q.options[v]}` : '';
-    const head = ['Name', 'Email', 'Role', 'Submitted', 'Score', 'Total', 'Percent', ...ex.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`])), 'Feedback'];
-    const key = ['ANSWER KEY', '', '', '', '', String(maxMarks(ex)), '', ...ex.questions.flatMap((q) => (isWritten(q) ? [q.text, String(q.marks)] : [cell(q, q.answer)])), ''];
+    const head = ['Name', 'Email', 'Role', 'Submitted', 'Score', 'Total', 'Percent', ...ex.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`]))];
+    const key = ['ANSWER KEY', '', '', '', '', String(maxMarks(ex)), '', ...ex.questions.flatMap((q) => (isWritten(q) ? [q.text, String(q.marks)] : [cell(q, q.answer)]))];
     const rows = done.map((r) => {
       const p = examTakerById(S, r.traineeId);
       return [
         p?.name ?? 'Unknown', p?.email ?? '', p?.role ?? '', r.submittedAt ? r.submittedAt.slice(0, 10) : '', r.score ?? '', r.total ?? maxMarks(ex), `${percent(r)}%`,
         ...ex.questions.flatMap((q) => (isWritten(q) ? [cell(q, r.answers[q.id]), r.writtenMarks?.[q.id] ?? ''] : [cell(q, r.answers[q.id])])),
-        r.feedback ?? '',
       ];
     });
     downloadCSV([head, key, ...rows], `${slug(ex.title) || 'exam'}-answer-sheet.csv`);
@@ -192,18 +191,26 @@ export function AssessmentForm({ id }: { id?: string }) {
   );
 }
 
-/** Marks a result is worth: multiple-choice by key plus the marks staff gave written answers. */
-export const resultScore = (a: Assessment, answers: Record<string, number | string>, written: Record<string, number> = {}) =>
-  a.questions.reduce((n, q) => n + (isWritten(q) ? Math.min(q.marks, Math.max(0, Number(written[q.id]) || 0)) : answers[q.id] === q.answer ? q.marks : 0), 0);
+/** Marker kept in a result's marks once staff have checked it (a checked sheet, marked answers or feedback). Until then the trainee sees "Result pending". */
+export const GRADED = '_graded';
+export const isGraded = (r: AssessmentAssign) => r.status === 'submitted' && !!r.writtenMarks && Object.keys(r.writtenMarks).length > 0;
 
-/** The trainee's answers next to the correct ones; written answers are marked here. */
-export function ResultReview({ assignId }: { assignId: string }) {
+/** Marks a result is worth. Marks staff gave a question (a checked answer sheet, or marking a written answer) win; otherwise multiple choice is scored from the key. */
+export const resultScore = (a: Assessment, answers: Record<string, number | string>, awarded: Record<string, number> = {}) =>
+  a.questions.reduce((n, q) => {
+    const given = awarded[q.id];
+    if (given !== undefined) return n + (Number(given) || 0);
+    return n + (!isWritten(q) && answers[q.id] === q.answer ? q.marks : 0);
+  }, 0);
+
+/** A result: the answers with the marks for each. Staff can mark written answers; the trainee gets a read-only view once it is checked. */
+export function ResultReview({ assignId, readOnly = false }: { assignId: string; readOnly?: boolean }) {
   const { S, closeModal, update, toast } = usePortal();
   const r = S.assessmentAssigns.find((a) => a.id === assignId);
   const a = r && S.assessments.find((x) => x.id === r.assessmentId);
-  const [marks, setMarks] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(r?.writtenMarks ?? {}).map(([k, v]) => [k, String(v)])));
+  const [marks, setMarks] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(r?.writtenMarks ?? {}).filter(([k]) => k !== GRADED).map(([k, v]) => [k, String(v)])));
   if (!r || !a) return <p>Not found.</p>;
-  const who = examTakerById(S, r.traineeId)?.name ?? 'Trainee';
+  const who = readOnly ? 'You' : examTakerById(S, r.traineeId)?.name ?? 'Trainee';
   const hasWritten = a.questions.some(isWritten);
 
   const saveMarks = () => {
@@ -218,8 +225,10 @@ export function ResultReview({ assignId }: { assignId: string }) {
     update((st) => {
       const rec = st.assessmentAssigns.find((x) => x.id === r.id);
       if (!rec) return;
-      rec.writtenMarks = given;
-      rec.score = resultScore(a, rec.answers, given);
+      // keep marks already set for other questions (a checked sheet); only the written answers shown here change
+      const all = { ...(rec.writtenMarks ?? {}), ...given, [GRADED]: 1 };
+      rec.writtenMarks = all;
+      rec.score = resultScore(a, rec.answers, all);
       rec.total = maxMarks(a);
     });
     toast('Marks saved');
@@ -228,7 +237,7 @@ export function ResultReview({ assignId }: { assignId: string }) {
   return (
     <>
       <h2>{a.title}</h2>
-      <p>{who} · scored <b>{r.score ?? 0}/{r.total ?? maxMarks(a)}</b> ({percent(r)}%)</p>
+      <p>{who} scored <b>{r.score ?? 0}/{r.total ?? maxMarks(a)}</b> ({percent(r)}%)</p>
       {r.feedback && (
         <div className="card" style={{ padding: 12, marginBottom: 10 }}>
           <b style={{ fontSize: 12 }}>Feedback</b>
@@ -238,32 +247,37 @@ export function ResultReview({ assignId }: { assignId: string }) {
       <div style={{ display: 'grid', gap: 10 }}>
         {a.questions.map((q, i) => {
           const pick = r.answers[q.id];
+          const given = r.writtenMarks?.[q.id];
           if (isWritten(q)) {
-            const given = r.writtenMarks?.[q.id];
             return (
               <div key={q.id} className="card" style={{ padding: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <b style={{ fontSize: 12 }}>Q{i + 1}. {q.text} <span className="pill progress">Written</span></b>
-                  <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
-                    <input type="number" min={0} max={q.marks} step={1} style={{ width: 64 }} value={marks[q.id] ?? ''} placeholder="–" aria-label={`Marks for Q${i + 1}`} onChange={(e) => setMarks((m) => ({ ...m, [q.id]: e.target.value }))} /> / {q.marks}
-                  </span>
+                  {readOnly ? (
+                    given !== undefined && <span className={`pill ${given ? 'active' : 'overdue'}`}>{given}/{q.marks}</span>
+                  ) : (
+                    <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+                      <input type="number" min={0} max={q.marks} step={1} style={{ width: 64 }} value={marks[q.id] ?? ''} placeholder="–" aria-label={`Marks for Q${i + 1}`} onChange={(e) => setMarks((m) => ({ ...m, [q.id]: e.target.value }))} /> / {q.marks}
+                    </span>
+                  )}
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>{typeof pick === 'string' && pick.trim() ? pick : <span className="subtle">Not answered</span>}</p>
-                {given === undefined && <small className="subtle">Not marked yet</small>}
+                {!readOnly && given === undefined && <small className="subtle">Not marked yet</small>}
               </div>
             );
           }
-          const ok = pick === q.answer;
+          // a trainee never receives the answer key, so without per-question marks there is nothing to show beside the answer
+          const got: number | undefined = given ?? (readOnly ? undefined : pick === q.answer ? q.marks : 0);
           return (
             <div key={q.id} className="card" style={{ padding: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <b style={{ fontSize: 12 }}>Q{i + 1}. {q.text}</b>
-                <span className={`pill ${ok ? 'active' : 'overdue'}`}>{ok ? q.marks : 0}/{q.marks}</span>
+                {got !== undefined && <span className={`pill ${got > 0 ? 'active' : 'overdue'}`}>{got}/{q.marks}</span>}
               </div>
               <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12 }}>
                 {q.options.map((o, k) => (
-                  <li key={k} style={{ color: k === q.answer ? '#2e7d32' : k === pick ? '#c62828' : undefined, fontWeight: k === q.answer || k === pick ? 700 : 400 }}>
-                    {o}{k === q.answer ? ' ✓' : ''}{k === pick && k !== q.answer ? ' (chosen)' : ''}
+                  <li key={k} style={{ color: k === q.answer ? '#2e7d32' : k === pick ? (readOnly ? (got === undefined ? undefined : got > 0 ? '#2e7d32' : '#c62828') : '#c62828') : undefined, fontWeight: k === q.answer || k === pick ? 700 : 400 }}>
+                    {o}{k === q.answer ? ' ✓' : ''}{k === pick && k !== q.answer ? (readOnly ? ' (your answer)' : ' (chosen)') : ''}
                   </li>
                 ))}
               </ul>
@@ -273,43 +287,35 @@ export function ResultReview({ assignId }: { assignId: string }) {
         })}
       </div>
       <div className="modal-actions">
-        {hasWritten && <button className="btn primary" onClick={saveMarks}>Save marks</button>}
+        {hasWritten && !readOnly && <button className="btn primary" onClick={saveMarks}>Save marks</button>}
         <button className="btn" onClick={closeModal}>Close</button>
       </div>
     </>
   );
 }
 
-/** Give the score and written feedback to someone who sat the assessment. */
-export function FeedbackForm({ id }: { id: string }) {
+/** Score and feedback for one person's result, opened from a row of the Assessment report. */
+export function FeedbackForm({ assignId }: { assignId: string }) {
   const { S, update, closeModal, toast } = usePortal();
-  const a = S.assessments.find((x) => x.id === id);
-  const rows = S.assessmentAssigns.filter((r) => r.assessmentId === id).map((r) => ({ r, p: examTakerById(S, r.traineeId) })).filter((x) => x.p);
-  const [who, setWho] = useState(rows[0]?.r.id ?? '');
-  const cur = rows.find((x) => x.r.id === who)?.r;
-  const [score, setScore] = useState(cur?.status === 'submitted' && cur.score != null ? String(cur.score) : '');
-  const [text, setText] = useState(cur?.feedback ?? '');
-  if (!a) return <p>Not found.</p>;
+  const r = S.assessmentAssigns.find((x) => x.id === assignId);
+  const a = r && S.assessments.find((x) => x.id === r.assessmentId);
+  const p = r && examTakerById(S, r.traineeId);
+  const [score, setScore] = useState(r?.status === 'submitted' && r.score != null ? String(r.score) : '');
+  const [text, setText] = useState(r?.feedback ?? '');
+  if (!r || !a) return <p>Not found.</p>;
   const max = maxMarks(a);
-
-  const pickPerson = (rid: string) => {
-    const r = rows.find((x) => x.r.id === rid)?.r;
-    setWho(rid);
-    setScore(r?.status === 'submitted' && r.score != null ? String(r.score) : '');
-    setText(r?.feedback ?? '');
-  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!cur) return toast('Choose who took the exam');
     const n = Number(score);
     if (score.trim() === '' || !Number.isFinite(n) || n < 0 || n > max) return toast(`Score must be between 0 and ${max}`);
     update((s) => {
-      const rec = s.assessmentAssigns.find((x) => x.id === cur.id);
+      const rec = s.assessmentAssigns.find((x) => x.id === r.id);
       if (!rec) return;
       rec.score = Math.round(n);
       rec.total = max;
       rec.feedback = text.trim();
+      rec.writtenMarks = { ...(rec.writtenMarks ?? {}), [GRADED]: 1 };
       if (rec.status !== 'submitted') {
         const at = new Date().toISOString();
         rec.status = 'submitted';
@@ -324,33 +330,97 @@ export function FeedbackForm({ id }: { id: string }) {
   return (
     <>
       <h2>Feedback</h2>
-      <p>{a.title} · out of {max} marks. The score shows in the Assessment report and the feedback is shown to the person who took the exam.</p>
-      {!rows.length ? (
-        <>
-          <p className="subtle">This assessment has not been assigned to anyone yet. Use Assign first.</p>
-          <div className="modal-actions"><button type="button" className="btn" onClick={closeModal}>Close</button></div>
-        </>
-      ) : (
-        <form onSubmit={submit}>
-          <div className="form-grid">
-            <div className="field full">
-              <label>Exam taken by</label>
-              <select value={who} onChange={(e) => pickPerson(e.target.value)}>
-                {rows.map(({ r, p }) => <option key={r.id} value={r.id}>{p!.name} ({p!.role}){r.status === 'submitted' ? ` · ${r.score}/${r.total}` : ''}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label>Score (out of {max})</label>
-              <input type="number" min={0} max={max} step={1} value={score} onChange={(e) => setScore(e.target.value)} required placeholder={`0 – ${max}`} />
-            </div>
-            <div className="field full">
-              <label>Feedback</label>
-              <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write feedback for the person who took the exam" />
-            </div>
+      <p>{a.title} · {p?.name ?? 'Exam user'} · out of {max} marks. The score shows in the Assessment report and the feedback is shown to the person who took the exam.</p>
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          <div className="field">
+            <label>Score (out of {max})</label>
+            <input type="number" min={0} max={max} step={1} value={score} onChange={(e) => setScore(e.target.value)} required placeholder={`0 – ${max}`} />
           </div>
-          <FormActions onCancel={closeModal} save="Save feedback" />
-        </form>
-      )}
+          <div className="field full">
+            <label>Feedback</label>
+            <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write feedback for the person who took the exam" />
+          </div>
+        </div>
+        <FormActions onCancel={closeModal} save="Save feedback" />
+      </form>
     </>
   );
+}
+
+const SHEET_COLUMNS = ['Assignment ID', 'Trainee', 'Q No', 'Type', 'Question', 'Marks', 'Answer Given', 'Correct Answer', 'Marks Awarded'];
+
+/** Downloads one person's answer sheet: every question with the answer given, ready to be checked offline and imported back. */
+export function exportAnswerSheet(S: State, r: AssessmentAssign) {
+  const a = S.assessments.find((x) => x.id === r.assessmentId);
+  if (!a) return;
+  const who = examTakerById(S, r.traineeId)?.name ?? 'Trainee';
+  const opt = (q: Question, i: number | undefined) => (typeof i === 'number' && q.options[i] !== undefined ? `${String.fromCharCode(65 + i)}. ${q.options[i]}` : '');
+  const rows = a.questions.map((q, i) => {
+    const v = r.answers[q.id];
+    const written = isWritten(q);
+    const awarded = r.writtenMarks?.[q.id] ?? '';
+    return [r.id, who, i + 1, written ? 'Written' : 'MCQ', q.text, q.marks, written ? (typeof v === 'string' ? v : '') : opt(q, typeof v === 'number' ? v : undefined), written ? '' : opt(q, q.answer), awarded];
+  });
+  downloadCSV([SHEET_COLUMNS, ...rows], `${slug(a.title) || 'exam'}-${slug(who) || 'answer'}-answer-sheet.csv`);
+}
+
+/** Whether the answer given matches the correct answer, comparing the whole text or just the option letter (B. CSM = B = b). */
+const sameAnswer = (given: string, correct: string) => {
+  const norm = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+  const letter = (v: string) => /^([a-f])(?:[.)\s]|$)/i.exec(v.trim())?.[1]?.toLowerCase();
+  if (!given.trim()) return false;
+  if (norm(given) === norm(correct)) return true;
+  const g = letter(given);
+  const c = letter(correct);
+  return !!g && !!c && g === c && (/^[a-f]$/i.test(given.trim()) || /^[a-f]$/i.test(correct.trim()));
+};
+
+/**
+ * Reads a checked answer sheet. The sheet alone decides the result: each row is matched by its Q No only, and the marks come from
+ * the sheet itself: Marks Awarded on a row is used as given; when it is blank, a row with a Correct Answer scores its Marks if Answer Given matches it. The assessment's
+ * question types, answer key and marks are not used, and feedback is not read.
+ */
+export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { error: string } | { written: Record<string, number>; score: number; total: number } {
+  const a = S.assessments.find((x) => x.id === r.assessmentId);
+  if (!a) return { error: 'Assessment not found' };
+  const rows = parseCSV(text);
+  if (!rows.length) return { error: 'No rows found in that file' };
+  const awarded: Record<string, number> = {};
+  let score = 0;
+  let total = 0;
+  let allOut = true;
+  for (const row of rows) {
+    const aid = (field(row, 'Assignment ID') ?? '').trim();
+    if (aid && aid !== r.id) return { error: 'This sheet belongs to a different exam result' };
+    const no = Number((field(row, 'Q No', 'No') ?? '').replace(/\D/g, ''));
+    if (!no) continue;
+    const q = a.questions[no - 1];
+    if (!q) return { error: `Q${no} does not exist in this assessment` };
+    const outOfRaw = (field(row, 'Marks') ?? '').trim();
+    const outOf = outOfRaw === '' ? NaN : Number(outOfRaw);
+    const given = (field(row, 'Answer Given') ?? '').trim();
+    const correct = (field(row, 'Correct Answer') ?? '').trim();
+    // the checker's Marks Awarded wins; when it is blank, a row with a Correct Answer is scored by comparing it with the Answer Given
+    const raw = (field(row, 'Marks Awarded', 'Marks Given') ?? '').trim();
+    let got: number;
+    if (raw !== '') {
+      got = Number(raw);
+      if (!Number.isFinite(got) || got < 0) return { error: `Q${no}: marks awarded must be a number, 0 or more` };
+      if (Number.isFinite(outOf) && got > outOf) return { error: `Q${no}: marks awarded (${got}) is more than the marks for the question (${outOf})` };
+    } else if (correct) {
+      got = sameAnswer(given, correct) ? (Number.isFinite(outOf) ? outOf : 0) : 0;
+    } else {
+      got = 0;
+    }
+    if (Number.isFinite(outOf)) total += outOf;
+    else allOut = false;
+    awarded[q.id] = got;
+    score += got;
+  }
+  if (!Object.keys(awarded).length) return { error: 'No questions found. Use the sheet exported from this result' };
+  // questions missing from the sheet count as 0, so the sheet is the whole result
+  for (const q of a.questions) if (awarded[q.id] === undefined) awarded[q.id] = 0;
+  awarded[GRADED] = 1;
+  return { written: awarded, score, total: allOut && total > 0 ? total : r.total ?? maxMarks(a) };
 }

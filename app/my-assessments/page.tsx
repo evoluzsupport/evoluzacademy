@@ -4,21 +4,15 @@ import { usePortal } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
 import { courseById } from '@/lib/selectors';
 import { Empty, Guard, PageHead, Pill } from '@/components/ui';
-import { durationLabel, isWritten, maxMarks, percent } from '@/components/assessments';
+import { ResultReview, isGraded, isWritten, maxMarks, percent } from '@/components/assessments';
 import { fmtDate } from '@/lib/util';
 import type { Assessment, AssessmentAssign } from '@/lib/types';
 
 const draftKey = (id: string) => `evoluzAssessment:${id}`;
-const clock = (sec: number) => {
-  const s = Math.max(0, sec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h ? h + ':' : ''}${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-};
 
-/** The trainee's own assessments: start one, answer it against the clock, and see the result. */
+/** The trainee's own assessments: start one, answer it at your own pace, and see the result. An exam you start but do not finish stays as a draft. */
 export default function MyAssessmentsPage() {
-  const { S, me, toast, refresh } = usePortal();
+  const { S, me, toast, refresh, openModal } = usePortal();
   const [taking, setTaking] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +35,7 @@ export default function MyAssessmentsPage() {
   const live = mine.find((x) => x.r.id === taking);
   return (
     <Guard kinds={['trainee', 'trainer', 'admin']}>
-      <PageHead title="My Assessments" desc="Quizzes for your courses. Each has a time limit that starts when you press Start." />
+      <PageHead title="My Assessments" desc="Quizzes for your courses. Press Start Exam to begin. If you stop before submitting, the exam is saved as a draft and you can continue it later." />
       {live && live.r.status !== 'submitted' ? (
         <Exam r={live.r} a={live.a} onDone={() => setTaking('')} />
       ) : !mine.length ? (
@@ -53,9 +47,9 @@ export default function MyAssessmentsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ margin: 0 }}>{a.title}</h3>
-                  <small className="subtle">{courseById(S, a.courseId)?.name} · {a.questions.length} questions · {maxMarks(a)} marks · {durationLabel(a.durationMin)}{r.due ? ` · due ${fmtDate(r.due)}` : ''}</small>
+                  <small className="subtle">{courseById(S, a.courseId)?.name} · {a.questions.length} questions · {maxMarks(a)} marks{r.due ? ` · due ${fmtDate(r.due)}` : ''}</small>
                   {a.description && <p style={{ margin: '8px 0 0' }}>{a.description}</p>}
-                  {r.status === 'submitted' && r.feedback && (
+                  {isGraded(r) && r.feedback && (
                     <div style={{ margin: '10px 0 0', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 8, background: '#f7f9fc' }}>
                       <b style={{ fontSize: 12 }}>Feedback</b>
                       <p style={{ margin: '4px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>{r.feedback}</p>
@@ -63,17 +57,23 @@ export default function MyAssessmentsPage() {
                   )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  {r.status === 'submitted' ? (
+                  {r.status === 'submitted' && !isGraded(r) ? (
+                    <>
+                      <Pill kind="progress">Result pending</Pill>
+                      <div><small className="subtle">Submitted {fmtDate(r.submittedAt.slice(0, 10))}. Your result will appear here once it has been checked.</small></div>
+                    </>
+                  ) : r.status === 'submitted' ? (
                     <>
                       <div style={{ fontSize: 24, fontWeight: 800 }}>{r.score}/{r.total}</div>
                       <span className={`pill ${percent(r) >= 50 ? 'active' : 'overdue'}`}>{percent(r)}%</span>
                       <div><small className="subtle">Submitted {fmtDate(r.submittedAt.slice(0, 10))}</small></div>
+                      <button className="btn soft" style={{ marginTop: 8 }} onClick={() => openModal(<ResultReview assignId={r.id} readOnly />, true)}>View result</button>
                     </>
                   ) : (
                     <>
-                      <Pill kind={r.status === 'in-progress' ? 'progress' : 'neutral'}>{r.status === 'in-progress' ? 'In progress' : 'Not started'}</Pill>{' '}
+                      <Pill kind={r.status === 'in-progress' ? 'progress' : 'neutral'}>{r.status === 'in-progress' ? 'Draft' : 'Not started'}</Pill>{' '}
                       <button className="btn primary" disabled={busy} onClick={() => (r.status === 'in-progress' ? setTaking(r.id) : void start(r))}>
-                        {r.status === 'in-progress' ? 'Resume Exam' : 'Start Exam'}
+                        {r.status === 'in-progress' ? 'Continue Exam' : 'Start Exam'}
                       </button>
                     </>
                   )}
@@ -89,17 +89,18 @@ export default function MyAssessmentsPage() {
 
 function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: () => void }) {
   const { toast, refresh, confirm } = usePortal();
-  const end = new Date(r.startedAt).getTime() + a.durationMin * 60000;
-  const [left, setLeft] = useState(() => Math.round((end - Date.now()) / 1000));
+  // an unfinished exam stays as a draft: answers come back from the saved draft (or this browser) when the trainee returns
   const [answers, setAnswers] = useState<Record<string, number | string>>(() => {
     try {
-      return JSON.parse(localStorage.getItem(draftKey(r.id)) || '{}');
-    } catch {
-      return {};
-    }
+      const local = JSON.parse(localStorage.getItem(draftKey(r.id)) || 'null');
+      if (local && Object.keys(local).length) return local;
+    } catch {}
+    return { ...r.answers };
   });
   const [sending, setSending] = useState(false);
   const sent = useRef(false);
+  const latest = useRef(answers);
+  latest.current = answers;
 
   const pick = (q: string, i: number | string) =>
     setAnswers((p) => {
@@ -110,11 +111,26 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
       return n;
     });
 
+  // keep the draft on the server too, so it survives a different browser or device; a failure here never interrupts the exam
+  useEffect(() => {
+    if (!Object.keys(answers).length) return;
+    const t = setTimeout(() => void supabase.rpc('save_assessment_draft', { p_id: r.id, p_answers: answers }).then(() => undefined, () => undefined), 1500);
+    return () => clearTimeout(t);
+  }, [answers, r.id]);
+
+  const saveDraft = async () => {
+    setSending(true);
+    await supabase.rpc('save_assessment_draft', { p_id: r.id, p_answers: latest.current });
+    await refresh();
+    toast('Saved as draft. Continue the exam any time from My Assessments');
+    onDone();
+  };
+
   const submit = useCallback(async () => {
     if (sent.current) return;
     sent.current = true;
     setSending(true);
-    const { error } = await supabase.rpc('submit_assessment', { p_id: r.id, p_answers: answers });
+    const { error } = await supabase.rpc('submit_assessment', { p_id: r.id, p_answers: latest.current });
     if (error) {
       sent.current = false;
       setSending(false);
@@ -124,17 +140,9 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
       localStorage.removeItem(draftKey(r.id));
     } catch {}
     await refresh();
-    toast('Assessment submitted');
+    toast('Assessment submitted. Your result is pending and will appear once it has been checked');
     onDone();
-  }, [answers, r.id, refresh, toast, onDone]);
-
-  useEffect(() => {
-    const t = setInterval(() => setLeft(Math.round((end - Date.now()) / 1000)), 1000);
-    return () => clearInterval(t);
-  }, [end]);
-  useEffect(() => {
-    if (left <= 0) void submit();
-  }, [left, submit]);
+  }, [r.id, refresh, toast, onDone]);
 
   const answered = a.questions.filter((q) => (isWritten(q) ? String(answers[q.id] ?? '').trim() !== '' : answers[q.id] !== undefined)).length;
   return (
@@ -142,9 +150,9 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
       <div className="card section-card" style={{ position: 'sticky', top: 0, zIndex: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <b>{a.title}</b>
-          <div><small className="subtle">{answered}/{a.questions.length} answered · {maxMarks(a)} marks</small></div>
+          <div><small className="subtle">{answered}/{a.questions.length} answered · {maxMarks(a)} marks · Your answers are saved as a draft until you submit</small></div>
         </div>
-        <span className={`pill ${left < 300 ? 'overdue' : 'progress'}`} style={{ fontSize: 16, padding: '6px 14px' }} aria-live="off">⏱ {clock(left)}</span>
+        <button className="btn" disabled={sending} onClick={() => void saveDraft()}>Save draft & exit</button>
       </div>
       <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
         {a.questions.map((q, i) => (
@@ -182,7 +190,7 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
               : void submit()
           }
         >
-          {sending ? 'Submitting…' : 'Submit assessment'}
+          {sending ? 'Please wait…' : 'Submit assessment'}
         </button>
       </div>
     </>

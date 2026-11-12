@@ -62,8 +62,12 @@ export function TopicDetails({
   );
 }
 
-/** One topic with its per-learner completion state; editable for trainers/admins. */
-export function TopicRow({ traineeId, course, topic, editable: allowed }: { traineeId: string; course: Course; topic: Topic; editable: boolean }) {
+/**
+ * One topic with its per-learner completion state; editable for trainers/admins.
+ * With `selfLog` a trainee can log their own topic: tick the points covered, choose who delivered it and when, then mark it covered.
+ * Once covered, only the trainer who delivered it (or an admin) can change it.
+ */
+export function TopicRow({ traineeId, course, topic, editable: allowed, selfLog = false }: { traineeId: string; course: Course; topic: Topic; editable: boolean; selfLog?: boolean }) {
   const { S, me, toggleTopic, patchCompletion } = usePortal();
   const rec = S.progress[topicKey(traineeId, course.id, topic.id)];
   const done = !!rec?.done;
@@ -76,6 +80,26 @@ export function TopicRow({ traineeId, course, topic, editable: allowed }: { trai
   const trainer = rec?.trainer ?? draftTrainer;
   const date = rec?.date ?? draftDate;
   const uidBase = `${traineeId}-${course.id}-${topic.id}`;
+  // points of "What we cover" the trainee has ticked off; kept in this browser so they survive a reload
+  const ptsKey = `evoluzPoints:${uidBase}`;
+  const [pts, setPts] = useState<Set<number>>(() => {
+    try {
+      return new Set<number>(JSON.parse(localStorage.getItem(ptsKey) || '[]'));
+    } catch {
+      return new Set<number>();
+    }
+  });
+  const tickPoint = (i: number, on: boolean) =>
+    setPts((p) => {
+      const n = new Set(p);
+      if (on) n.add(i);
+      else n.delete(i);
+      try {
+        localStorage.setItem(ptsKey, JSON.stringify([...n]));
+      } catch {}
+      return n;
+    });
+  const mine = selfLog && me?.id === traineeId;
 
   return (
     <div className="topic-row">
@@ -93,9 +117,25 @@ export function TopicRow({ traineeId, course, topic, editable: allowed }: { trai
       </button>
       <div>
         <div className="topic-title">{topic.topic}</div>
-        <TopicDetails cover={topic.cover} activity={topic.activity} />
+        {mine ? <TopicDetails cover={topic.cover} activity={topic.activity} checked={pts} onCheck={tickPoint} disabled={done} /> : <TopicDetails cover={topic.cover} activity={topic.activity} />}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-          {editable ? (
+          {mine && !done ? (
+            <>
+              <label className="subtle" htmlFor={`tr-${uidBase}`}>
+                Delivered by{' '}
+                <select id={`tr-${uidBase}`} className="select" style={{ padding: '5px 7px', fontSize: 10 }} value={trainer} onChange={(e) => setDraftTrainer(e.target.value)}>
+                  {trainerNames(S, trainer).map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="subtle" htmlFor={`dt-${uidBase}`}>
+                Date{' '}
+                <input id={`dt-${uidBase}`} className="input" type="date" max={today()} style={{ padding: '5px 7px', fontSize: 10 }} value={date} onChange={(e) => setDraftDate(e.target.value)} />
+              </label>
+              <button type="button" className="btn soft" onClick={() => toggleTopic(traineeId, course.id, topic.id, trainer, date)}>Mark Topic Covered</button>
+            </>
+          ) : editable ? (
             <>
               <label className="subtle" htmlFor={`tr-${uidBase}`}>
                 Delivered by{' '}

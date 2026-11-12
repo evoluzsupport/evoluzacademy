@@ -110,7 +110,12 @@ export default function SessionPage() {
   const save = () => {
     const attendees = traineeIds;
     const toSave = topicIds.filter((id) => !lockedTopic(id));
-    if (!attendees.length || !toSave.length) return toast('Choose a course, at least one attendee, and a topic');
+    if (!attendees.length) return toast('Choose at least one attendee');
+    if (!toSave.length) {
+      if (topicIds.length) return toast('Those topics are already covered for the selected attendees. Pick a topic that is not yet covered, or tick “Update already completed topics”');
+      if (points.size) return toast('Click “Mark Topic Covered” on the topic. Ticking its points alone does not select the topic');
+      return toast('Click “Mark Topic Covered” on at least one topic');
+    }
     if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
     const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds: toSave, updateExisting, by: me ? { name: me.name, admin: me.kind === 'admin' } : undefined });
     if (msg) {
@@ -237,7 +242,7 @@ export default function SessionPage() {
                 </span>
                 <div className="covered-wrap">
                   <button type="button" className="btn soft covered-btn" disabled={covered} onClick={() => setTopicIds((l) => toggle(l, x.id, true))}>
-                    {covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
+                    {locked ? 'Already Covered' : covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
                   </button>
                   {covered && (
                     <span className="covered-by">by {(locked ? last?.trainer : undefined) || trainer || firstTrainer(c)}</span>

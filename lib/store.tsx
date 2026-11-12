@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { Kind, Me, State, Trainee, Trainer } from './types';
 import { removedEmail } from './emails';
 import { sendAccessRequestMail, sendAll } from './mailer';
-import { emptyState, loadRemote, myProfile, pushDiff } from './sync';
+import { emptyState, feedbackColumn, isFeedbackColumnError, loadRemote, myProfile, pushDiff } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
@@ -289,6 +289,18 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       queue.current = queue.current
         .then(() => pushDiff(prev, next))
         .catch(async (e) => {
+          // the feedback column has not been added to the database yet: save everything else, tell the user about the feedback
+          if (isFeedbackColumnError(e)) {
+            feedbackColumn.ok = false;
+            try {
+              await pushDiff(prev, next);
+              toast('Saved, but the feedback text could not be stored: add the feedback column to the database (supabase/assessments-drafts.sql)');
+            } catch (e2) {
+              toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
+            }
+            await reload();
+            return;
+          }
           toast(`Could not save: ${e instanceof Error ? e.message : 'unknown error'}`);
           await reload();
         });

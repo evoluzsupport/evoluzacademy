@@ -1,16 +1,16 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { usePortal } from '@/lib/store';
 import { courseById, examTakerById, learners } from '@/lib/selectors';
 import { Avatar, Empty, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
-import { AssessmentForm, FeedbackForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
+import { AssessmentForm, FeedbackForm, ResultReview, isGraded, exportAnswerSheet, readAnswerSheet, durationLabel, maxMarks, percent } from '@/components/assessments';
 import { fmtDate, today, uid } from '@/lib/util';
 
 type Tab = 'list' | 'assign' | 'report';
 
 const STATUS: Record<string, { label: string; kind: string }> = {
   assigned: { label: 'Not started', kind: 'neutral' },
-  'in-progress': { label: 'In progress', kind: 'progress' },
+  'in-progress': { label: 'Draft', kind: 'progress' },
   submitted: { label: 'Submitted', kind: 'active' },
 };
 
@@ -63,7 +63,6 @@ export default function AssessmentsPage() {
                       <td>
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
                           <button className="btn soft" onClick={() => { setTab('assign'); setPick(a.id); }}>Assign</button>
-                          <button className="btn soft" onClick={() => openModal(<FeedbackForm id={a.id} />)}>Feedback</button>
                           <button className="btn" onClick={() => openModal(<AssessmentForm id={a.id} />, true)}>Edit</button>
                           <button
                             className="btn"
@@ -164,10 +163,26 @@ function ReportTab() {
   const { S, openModal, update, confirm, toast } = usePortal();
   const [course, setCourse] = useState('');
   const [status, setStatus] = useState('');
+  const sheet = useRef<HTMLInputElement>(null);
+  const [sheetFor, setSheetFor] = useState('');
   const rows = S.assessmentAssigns
     .map((r) => ({ r, a: S.assessments.find((x) => x.id === r.assessmentId), t: examTakerById(S, r.traineeId) }))
     .filter((x) => x.a && x.t && (!course || x.a.courseId === course) && (!status || x.r.status === status))
     .sort((x, y) => (y.r.submittedAt || y.r.assignedOn).localeCompare(x.r.submittedAt || x.r.assignedOn));
+  const importSheet = async (f: File) => {
+    const r = S.assessmentAssigns.find((x) => x.id === sheetFor);
+    if (!r) return;
+    const res = readAnswerSheet(S, r, await f.text());
+    if ('error' in res) return toast(res.error);
+    update((s) => {
+      const rec = s.assessmentAssigns.find((x) => x.id === r.id);
+      if (!rec) return;
+      rec.writtenMarks = res.written;
+      rec.score = res.score;
+      rec.total = res.total;
+    });
+    toast(`Answer sheet imported. Score ${res.score}/${res.total} (${res.total ? Math.round((res.score / res.total) * 100) : 0}%)`);
+  };
   const done = rows.filter((x) => x.r.status === 'submitted');
   const avg = done.length ? Math.round(done.reduce((n, x) => n + percent(x.r), 0) / done.length) : 0;
 
@@ -181,13 +196,14 @@ function ReportTab() {
         <select className="select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           <option value="">Any status</option>
           <option value="assigned">Not started</option>
-          <option value="in-progress">In progress</option>
+          <option value="in-progress">Draft</option>
           <option value="submitted">Submitted</option>
         </select>
         <span className="pill neutral">{rows.length} assigned</span>
         <span className="pill active">{done.length} submitted</span>
         {!!done.length && <span className="pill progress">Average {avg}%</span>}
       </div>
+      <input ref={sheet} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importSheet(f); }} />
       {!rows.length ? (
         <Empty>No assessments have been assigned yet.</Empty>
       ) : (
@@ -203,11 +219,14 @@ function ReportTab() {
                   <td>{courseById(S, a!.courseId)?.name}</td>
                   <td>{a!.title}<br /><small className="subtle">Due {fmtDate(r.due)}</small></td>
                   <td><Pill kind={STATUS[r.status].kind}>{STATUS[r.status].label}</Pill></td>
-                  <td>{r.status === 'submitted' ? <><b>{r.score}/{r.total}</b> <span className={`pill ${percent(r) >= 50 ? 'active' : 'overdue'}`}>{percent(r)}%</span></> : <span className="subtle">Max {maxMarks(a!)}</span>}</td>
+                  <td>{r.status === 'submitted' ? (isGraded(r) ? <><b>{r.score}/{r.total}</b> <span className={`pill ${percent(r) >= 50 ? 'active' : 'overdue'}`}>{percent(r)}%</span></> : <><b>{r.score}/{r.total}</b> <span className="pill neutral" title="Export the answer sheet, check it, and import it back to release the result to the trainee">Pending check</span></>) : <span className="subtle">Max {maxMarks(a!)}</span>}</td>
                   <td>{r.submittedAt ? fmtDate(r.submittedAt.slice(0, 10)) : '—'}</td>
                   <td>
                     <div className="actions" style={{ justifyContent: 'flex-end' }}>
                       {r.status === 'submitted' && <button className="btn soft" onClick={() => openModal(<ResultReview assignId={r.id} />, true)}>Review</button>}
+                      <button className="btn soft" onClick={() => openModal(<FeedbackForm assignId={r.id} />)}>Feedback</button>
+                      {r.status === 'submitted' && <button className="btn" title="Download the answer sheet to check offline" onClick={() => exportAnswerSheet(S, r)}>⇩ Export sheet</button>}
+                      {r.status === 'submitted' && <button className="btn" title="Upload the checked answer sheet; the score is updated automatically" onClick={() => { setSheetFor(r.id); sheet.current?.click(); }}>↑ Import sheet</button>}
                       <button
                         className="btn"
                         onClick={() =>
