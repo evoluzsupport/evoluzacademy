@@ -123,6 +123,8 @@ export interface AssessmentAssign {
   answers: Record<string, number | string>;
   /** question id to the marks staff gave a written answer */
   writtenMarks?: Record<string, number>;
+  /** staff feedback to the person who took the exam */
+  feedback?: string;
 }
 export interface State {
   admins: Admin[];
