@@ -180,7 +180,6 @@ function ReportTab() {
       rec.writtenMarks = res.written;
       rec.score = res.score;
       rec.total = res.total;
-      if (res.feedback !== undefined) rec.feedback = res.feedback;
     });
     toast(`Answer sheet imported. Score ${res.score}/${res.total} (${res.total ? Math.round((res.score / res.total) * 100) : 0}%)`);
   };

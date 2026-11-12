@@ -73,7 +73,7 @@ export function AssessmentForm({ id }: { id?: string }) {
     toast(`${questions.length} ${questions.length === 1 ? 'question' : 'questions'} imported${skipped ? `, ${skipped} skipped` : ''}`);
   };
 
-  /** Downloads the answer sheet of everyone who has sat this assessment: their answers, score and feedback, under an answer-key row. */
+  /** Downloads the answer sheet of everyone who has sat this assessment: their answers and score, under an answer-key row. */
   const exportExam = () => {
     if (!ex) return;
     const done = S.assessmentAssigns.filter((r) => r.assessmentId === ex.id && r.status === 'submitted');
@@ -81,14 +81,13 @@ export function AssessmentForm({ id }: { id?: string }) {
     const letter = (i: number) => String.fromCharCode(65 + i);
     const cell = (q: Question, v: number | string | undefined) =>
       isWritten(q) ? (typeof v === 'string' ? v : '') : typeof v === 'number' && q.options[v] !== undefined ? `${letter(v)}. ${q.options[v]}` : '';
-    const head = ['Name', 'Email', 'Role', 'Submitted', 'Score', 'Total', 'Percent', ...ex.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`])), 'Feedback'];
-    const key = ['ANSWER KEY', '', '', '', '', String(maxMarks(ex)), '', ...ex.questions.flatMap((q) => (isWritten(q) ? [q.text, String(q.marks)] : [cell(q, q.answer)])), ''];
+    const head = ['Name', 'Email', 'Role', 'Submitted', 'Score', 'Total', 'Percent', ...ex.questions.flatMap((q, i) => (isWritten(q) ? [`Q${i + 1}`, `Q${i + 1} Marks`] : [`Q${i + 1}`]))];
+    const key = ['ANSWER KEY', '', '', '', '', String(maxMarks(ex)), '', ...ex.questions.flatMap((q) => (isWritten(q) ? [q.text, String(q.marks)] : [cell(q, q.answer)]))];
     const rows = done.map((r) => {
       const p = examTakerById(S, r.traineeId);
       return [
         p?.name ?? 'Unknown', p?.email ?? '', p?.role ?? '', r.submittedAt ? r.submittedAt.slice(0, 10) : '', r.score ?? '', r.total ?? maxMarks(ex), `${percent(r)}%`,
         ...ex.questions.flatMap((q) => (isWritten(q) ? [cell(q, r.answers[q.id]), r.writtenMarks?.[q.id] ?? ''] : [cell(q, r.answers[q.id])])),
-        r.feedback ?? '',
       ];
     });
     downloadCSV([head, key, ...rows], `${slug(ex.title) || 'exam'}-answer-sheet.csv`);
@@ -337,7 +336,7 @@ export function FeedbackForm({ assignId }: { assignId: string }) {
   );
 }
 
-const SHEET_COLUMNS = ['Assignment ID', 'Trainee', 'Q No', 'Type', 'Question', 'Marks', 'Answer Given', 'Correct Answer', 'Marks Awarded', 'Feedback'];
+const SHEET_COLUMNS = ['Assignment ID', 'Trainee', 'Q No', 'Type', 'Question', 'Marks', 'Answer Given', 'Correct Answer', 'Marks Awarded'];
 
 /** Downloads one person's answer sheet: every question with the answer given, ready to be checked offline and imported back. */
 export function exportAnswerSheet(S: State, r: AssessmentAssign) {
@@ -349,22 +348,21 @@ export function exportAnswerSheet(S: State, r: AssessmentAssign) {
     const v = r.answers[q.id];
     const written = isWritten(q);
     const awarded = r.writtenMarks?.[q.id] ?? (written ? '' : v === q.answer ? q.marks : 0);
-    return [r.id, who, i + 1, written ? 'Written' : 'MCQ', q.text, q.marks, written ? (typeof v === 'string' ? v : '') : opt(q, typeof v === 'number' ? v : undefined), written ? '' : opt(q, q.answer), awarded, i === 0 ? r.feedback ?? '' : ''];
+    return [r.id, who, i + 1, written ? 'Written' : 'MCQ', q.text, q.marks, written ? (typeof v === 'string' ? v : '') : opt(q, typeof v === 'number' ? v : undefined), written ? '' : opt(q, q.answer), awarded];
   });
   downloadCSV([SHEET_COLUMNS, ...rows], `${slug(a.title) || 'exam'}-${slug(who) || 'answer'}-answer-sheet.csv`);
 }
 
 /**
  * Reads a checked answer sheet. The sheet alone decides the result: each row is matched by its Q No only, and the marks come from
- * the Marks Awarded column (out of the row's Marks). The assessment's question types, answer key and marks are not used.
+ * the Marks Awarded column (out of the row's Marks). The assessment's question types, answer key and marks are not used, and feedback is not read.
  */
-export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { error: string } | { written: Record<string, number>; feedback: string | undefined; score: number; total: number } {
+export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { error: string } | { written: Record<string, number>; score: number; total: number } {
   const a = S.assessments.find((x) => x.id === r.assessmentId);
   if (!a) return { error: 'Assessment not found' };
   const rows = parseCSV(text);
   if (!rows.length) return { error: 'No rows found in that file' };
   const awarded: Record<string, number> = {};
-  const remarks: { no: number; text: string }[] = [];
   let score = 0;
   let total = 0;
   let allOut = true;
@@ -375,8 +373,6 @@ export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { 
     if (!no) continue;
     const q = a.questions[no - 1];
     if (!q) return { error: `Q${no} does not exist in this assessment` };
-    const fb = (field(row, 'Feedback') ?? '').trim();
-    if (fb) remarks.push({ no, text: fb });
     const raw = (field(row, 'Marks Awarded', 'Marks Given') ?? '').trim();
     const got = raw === '' ? 0 : Number(raw);
     const outOfRaw = (field(row, 'Marks') ?? '').trim();
@@ -391,7 +387,5 @@ export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { 
   if (!Object.keys(awarded).length) return { error: 'No questions found. Use the sheet exported from this result' };
   // questions missing from the sheet count as 0, so the sheet is the whole result
   for (const q of a.questions) if (awarded[q.id] === undefined) awarded[q.id] = 0;
-  // one remark is the overall feedback; remarks on several questions are kept as one line per question
-  const feedback = !remarks.length ? undefined : remarks.length === 1 ? remarks[0].text : remarks.map((x) => `Q${x.no}: ${x.text}`).join('\n');
-  return { written: awarded, feedback, score, total: allOut && total > 0 ? total : r.total ?? maxMarks(a) };
+  return { written: awarded, score, total: allOut && total > 0 ? total : r.total ?? maxMarks(a) };
 }
