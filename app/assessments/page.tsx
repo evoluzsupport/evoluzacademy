@@ -10,7 +10,7 @@ type Tab = 'list' | 'assign' | 'report';
 
 const STATUS: Record<string, { label: string; kind: string }> = {
   assigned: { label: 'Not started', kind: 'neutral' },
-  'in-progress': { label: 'In progress', kind: 'progress' },
+  'in-progress': { label: 'Draft', kind: 'progress' },
   submitted: { label: 'Submitted', kind: 'active' },
 };
 
@@ -197,7 +197,7 @@ function ReportTab() {
         <select className="select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           <option value="">Any status</option>
           <option value="assigned">Not started</option>
-          <option value="in-progress">In progress</option>
+          <option value="in-progress">Draft</option>
           <option value="submitted">Submitted</option>
         </select>
         <span className="pill neutral">{rows.length} assigned</span>

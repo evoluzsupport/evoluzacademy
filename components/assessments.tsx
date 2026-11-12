@@ -357,14 +357,14 @@ export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { 
   const rows = parseCSV(text);
   if (!rows.length) return { error: 'No rows found in that file' };
   const written: Record<string, number> = { ...(r.writtenMarks ?? {}) };
-  let feedback: string | undefined;
+  const remarks: { no: number; text: string }[] = [];
   let matched = 0;
   for (const row of rows) {
     const aid = (field(row, 'Assignment ID') ?? '').trim();
     if (aid && aid !== r.id) return { error: 'This sheet belongs to a different exam result' };
     const fb = (field(row, 'Feedback') ?? '').trim();
-    if (fb && feedback === undefined) feedback = fb;
     const no = Number((field(row, 'Q No', 'No') ?? '').replace(/\D/g, ''));
+    if (fb) remarks.push({ no, text: fb });
     const q = no ? a.questions[no - 1] : undefined;
     if (!q) continue;
     matched++;
@@ -376,5 +376,7 @@ export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { 
     written[q.id] = n;
   }
   if (!matched) return { error: 'No questions matched. Use the sheet exported from this result' };
+  // one remark is the overall feedback; remarks on several questions are kept as one line per question
+  const feedback = !remarks.length ? undefined : remarks.length === 1 ? remarks[0].text : remarks.map((x) => `Q${x.no}: ${x.text}`).join('\n');
   return { written, feedback, score: resultScore(a, r.answers, written), total: maxMarks(a) };
 }

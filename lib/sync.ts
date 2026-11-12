@@ -20,6 +20,10 @@ export const emptyState = (): State => ({
   assessmentAssigns: [],
 });
 
+/** Set to false once the database reports that assessment_assignments has no feedback column, so other data still saves. */
+export const feedbackColumn = { ok: true };
+export const isFeedbackColumnError = (e: unknown) => e instanceof Error && /'feedback' column/.test(e.message);
+
 interface Table {
   name: string;
   pk: string[];
@@ -185,7 +189,7 @@ const TABLES: Table[] = [
     order: ['id'],
     // the feedback column is only written once someone has feedback, so saves keep working on a database that does not have it yet
     rows: (s) => {
-      const withFeedback = s.assessmentAssigns.some((a) => a.feedback);
+      const withFeedback = feedbackColumn.ok && s.assessmentAssigns.some((a) => a.feedback);
       return s.assessmentAssigns.map((a) => ({
         id: a.id,
         assessment_id: a.assessmentId,
