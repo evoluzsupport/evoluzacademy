@@ -353,9 +353,21 @@ export function exportAnswerSheet(S: State, r: AssessmentAssign) {
   downloadCSV([SHEET_COLUMNS, ...rows], `${slug(a.title) || 'exam'}-${slug(who) || 'answer'}-answer-sheet.csv`);
 }
 
+/** Whether the answer given matches the correct answer, comparing the whole text or just the option letter (B. CSM = B = b). */
+const sameAnswer = (given: string, correct: string) => {
+  const norm = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+  const letter = (v: string) => /^([a-f])(?:[.)\s]|$)/i.exec(v.trim())?.[1]?.toLowerCase();
+  if (!given.trim()) return false;
+  if (norm(given) === norm(correct)) return true;
+  const g = letter(given);
+  const c = letter(correct);
+  return !!g && !!c && g === c && (/^[a-f]$/i.test(given.trim()) || /^[a-f]$/i.test(correct.trim()));
+};
+
 /**
  * Reads a checked answer sheet. The sheet alone decides the result: each row is matched by its Q No only, and the marks come from
- * the Marks Awarded column (out of the row's Marks). The assessment's question types, answer key and marks are not used, and feedback is not read.
+ * the sheet itself: a row with a Correct Answer scores its Marks when Answer Given matches it, other rows use Marks Awarded. The assessment's
+ * question types, answer key and marks are not used, and feedback is not read.
  */
 export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { error: string } | { written: Record<string, number>; score: number; total: number } {
   const a = S.assessments.find((x) => x.id === r.assessmentId);
@@ -373,12 +385,21 @@ export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { 
     if (!no) continue;
     const q = a.questions[no - 1];
     if (!q) return { error: `Q${no} does not exist in this assessment` };
-    const raw = (field(row, 'Marks Awarded', 'Marks Given') ?? '').trim();
-    const got = raw === '' ? 0 : Number(raw);
     const outOfRaw = (field(row, 'Marks') ?? '').trim();
     const outOf = outOfRaw === '' ? NaN : Number(outOfRaw);
-    if (!Number.isFinite(got) || got < 0) return { error: `Q${no}: marks awarded must be a number, 0 or more` };
-    if (Number.isFinite(outOf) && got > outOf) return { error: `Q${no}: marks awarded (${got}) is more than the marks for the question (${outOf})` };
+    const given = (field(row, 'Answer Given') ?? '').trim();
+    const correct = (field(row, 'Correct Answer') ?? '').trim();
+    let got: number;
+    if (correct) {
+      // a row with a correct answer is scored automatically: the answer given must match it
+      got = sameAnswer(given, correct) ? (Number.isFinite(outOf) ? outOf : 0) : 0;
+    } else {
+      // no correct answer on the row (a written answer): use the marks entered for it
+      const raw = (field(row, 'Marks Awarded', 'Marks Given') ?? '').trim();
+      got = raw === '' ? 0 : Number(raw);
+      if (!Number.isFinite(got) || got < 0) return { error: `Q${no}: marks awarded must be a number, 0 or more` };
+      if (Number.isFinite(outOf) && got > outOf) return { error: `Q${no}: marks awarded (${got}) is more than the marks for the question (${outOf})` };
+    }
     if (Number.isFinite(outOf)) total += outOf;
     else allOut = false;
     awarded[q.id] = got;
