@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { usePortal } from '@/lib/store';
 import { firstTrainer } from '@/lib/seed';
 import { canEditCompletion, nameMatches, topicKey, trainerNames } from '@/lib/selectors';
@@ -13,6 +14,9 @@ const bullets = (v?: string, commas = false) =>
     .map((x) => x.trim().replace(/[.;,]+$/, ''))
     .filter(Boolean);
 
+/** The "What we cover" points of a topic, in order. A point is identified by its index in this list. */
+export const coverPoints = (cover?: string) => bullets(cover, true);
+
 /** "What we cover" and "Activity" as two labelled bullet lists. */
 export function TopicDetails({
   cover,
@@ -20,6 +24,9 @@ export function TopicDetails({
   checked,
   onCheck,
   disabled,
+  locked,
+  extra,
+  readOnly,
 }: {
   cover?: string;
   activity?: string;
@@ -27,8 +34,14 @@ export function TopicDetails({
   checked?: Set<number>;
   onCheck?: (index: number, on: boolean) => void;
   disabled?: boolean;
+  /** points that are already recorded: shown ticked and not changeable */
+  locked?: Set<number>;
+  /** something to show after a point, e.g. who delivered it */
+  extra?: (index: number) => ReactNode;
+  /** show the boxes but do not let them be changed (they do not force a tick like `disabled` does) */
+  readOnly?: boolean;
 }) {
-  const c = bullets(cover, true);
+  const c = coverPoints(cover);
   const a = bullets(activity);
   if (!c.length && !a.length) return null;
   return (
@@ -41,9 +54,10 @@ export function TopicDetails({
               {c.map((x, i) => (
                 <li key={i}>
                   <label>
-                    <input type="checkbox" checked={disabled || checked.has(i)} disabled={disabled} onChange={(e) => onCheck(i, e.target.checked)} />
+                    <input type="checkbox" checked={disabled || checked.has(i) || !!locked?.has(i)} disabled={disabled || readOnly || !!locked?.has(i)} onChange={(e) => onCheck(i, e.target.checked)} />
                     <span>{x}</span>
                   </label>
+                  {extra?.(i)}
                 </li>
               ))}
             </ul>
@@ -100,6 +114,13 @@ export function TopicRow({ traineeId, course, topic, editable: allowed, selfLog 
       return n;
     });
   const mine = selfLog && me?.id === traineeId;
+  // subtopics already recorded for this learner (the whole topic counts as every subtopic), with who delivered each
+  const pointRec = (i: number) => S.points[`${topicKey(traineeId, course.id, topic.id)}|${i}`] ?? (done ? rec : undefined);
+  const recorded = new Set(coverPoints(topic.cover).map((_, i) => i).filter((i) => !!pointRec(i)));
+  const byWho = (i: number) => {
+    const t = pointRec(i)?.trainer;
+    return t ? <small className="covered-by" style={{ marginLeft: 24 }}>by {t}</small> : null;
+  };
 
   return (
     <div className="topic-row">
@@ -117,7 +138,16 @@ export function TopicRow({ traineeId, course, topic, editable: allowed, selfLog 
       </button>
       <div>
         <div className="topic-title">{topic.topic}</div>
-        {mine ? <TopicDetails cover={topic.cover} activity={topic.activity} checked={pts} onCheck={tickPoint} disabled={done} /> : <TopicDetails cover={topic.cover} activity={topic.activity} />}
+        <TopicDetails
+          cover={topic.cover}
+          activity={topic.activity}
+          checked={mine ? pts : new Set<number>()}
+          onCheck={mine ? tickPoint : () => undefined}
+          locked={recorded}
+          disabled={mine && done}
+          readOnly={!mine}
+          extra={byWho}
+        />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
           {mine && !done ? (
             <>

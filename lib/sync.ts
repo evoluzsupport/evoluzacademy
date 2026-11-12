@@ -15,6 +15,7 @@ export const emptyState = (): State => ({
   courses: [],
   assignments: [],
   progress: {},
+  points: {},
   sessions: [],
   assessments: [],
   assessmentAssigns: [],
@@ -22,6 +23,9 @@ export const emptyState = (): State => ({
 
 /** Set to false once the database reports that assessment_assignments has no feedback column, so other data still saves. */
 export const feedbackColumn = { ok: true };
+/** Set to false once the database reports there is no progress_points table, so sessions still save without subtopic records. */
+export const pointsTable = { ok: true };
+export const isPointsTableError = (e: unknown) => e instanceof Error && /progress_points/.test(e.message);
 export const isFeedbackColumnError = (e: unknown) => e instanceof Error && /'feedback' column/.test(e.message);
 
 interface Table {
@@ -207,6 +211,18 @@ const TABLES: Table[] = [
       }));
     },
   },
+  {
+    name: 'progress_points',
+    pk: ['trainee_id', 'course_id', 'topic_id', 'point'],
+    order: ['trainee_id', 'course_id', 'topic_id', 'point'],
+    rows: (s) =>
+      pointsTable.ok
+        ? Object.entries(s.points ?? {}).map(([k, r]) => {
+            const [trainee_id, course_id, topic_id, point] = k.split('|');
+            return { trainee_id, course_id, topic_id, point: Number(point), done_on: r.date, trainer: r.trainer, session_id: r.sessionId ?? null };
+          })
+        : [],
+  },
 ];
 
 const keyOf = (t: Table, r: Row) => t.pk.map((c) => String(r[c])).join('|');
@@ -285,8 +301,9 @@ async function fetchAll(t: Table): Promise<Row[]> {
 }
 
 export async function loadRemote(): Promise<State> {
-  const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress, asms, aqs, akeys, aassigns] = await Promise.all(
-    TABLES.map(fetchAll)
+  // the subtopic table is optional: a database without it still loads
+  const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress, asms, aqs, akeys, aassigns, pts] = await Promise.all(
+    TABLES.map((t) => (t.name === 'progress_points' ? fetchAll(t).catch(() => [] as Row[]) : fetchAll(t)))
   );
   const s = emptyState();
 
@@ -362,6 +379,9 @@ export async function loadRemote(): Promise<State> {
     })
   );
 
+  for (const r of pts) {
+    s.points[`${r.trainee_id}|${r.course_id}|${r.topic_id}|${r.point}`] = { date: str(r.done_on), trainer: str(r.trainer), ...(r.session_id ? { sessionId: str(r.session_id) } : {}) };
+  }
   for (const r of progress) {
     const rec: ProgressRec = { done: true, date: str(r.done_on), trainer: str(r.trainer) };
     if (r.session_id) rec.sessionId = str(r.session_id);

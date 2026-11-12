@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { Kind, Me, State, Trainee, Trainer } from './types';
 import { removedEmail } from './emails';
 import { sendAccessRequestMail, sendAll } from './mailer';
-import { emptyState, feedbackColumn, isFeedbackColumnError, loadRemote, myProfile, pushDiff } from './sync';
+import { emptyState, feedbackColumn, isFeedbackColumnError, isPointsTableError, loadRemote, myProfile, pointsTable, pushDiff } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
@@ -23,6 +23,10 @@ export interface SessionDraft {
   date: string;
   traineeIds: string[];
   topicIds: string[];
+  /** who delivered the topics marked covered, when it differs from the session trainer (several trainers join with " / ") */
+  topicTrainer?: Record<string, string>;
+  /** subtopics ("What we cover" points) delivered in this session, each with its own trainer */
+  points?: { topicId: string; index: number; trainer: string }[];
   updateExisting: boolean;
   /** who is saving it: other people's completed topics are never overwritten unless they are an admin */
   by?: { name: string; admin: boolean };
@@ -91,7 +95,8 @@ function applySession(s: State, d: SessionDraft): string | null {
   // anyone in the directory can attend; people not yet on the course are assigned to it
   const known = new Set([...s.admins, ...s.trainers, ...s.trainees].map((p) => p.id));
   const attendees = d.traineeIds.filter((tid) => known.has(tid));
-  if (!c || !attendees.length || !d.topicIds.length) return null;
+  const points = d.points ?? [];
+  if (!c || !attendees.length || (!d.topicIds.length && !points.length)) return null;
   for (const tid of attendees)
     if (!isAssigned(s, tid, c.id)) s.assignments.push({ id: uid('a'), traineeId: tid, courseId: c.id, assignedOn: today(), due: '', assignedBy: d.by?.name ?? '' });
   const id = uid('s');
@@ -105,8 +110,17 @@ function applySession(s: State, d: SessionDraft): string | null {
         kept++;
         continue;
       }
-      s.progress[key] = { done: true, date: d.date, trainer: d.trainer, sessionId: id };
+      s.progress[key] = { done: true, date: d.date, trainer: d.topicTrainer?.[topicId] || d.trainer, sessionId: id };
       newMarks++;
+    }
+  // subtopics: recorded per learner unless the whole topic is already covered or that subtopic was already logged
+  let pointMarks = 0;
+  for (const p of points)
+    for (const tid of attendees) {
+      const key = `${topicKey(tid, c.id, p.topicId)}|${p.index}`;
+      if (s.progress[topicKey(tid, c.id, p.topicId)]?.done || (s.points[key] && !d.updateExisting)) continue;
+      s.points[key] = { date: d.date, trainer: p.trainer, sessionId: id };
+      pointMarks++;
     }
   s.sessions.push({
     id,
@@ -115,11 +129,11 @@ function applySession(s: State, d: SessionDraft): string | null {
     date: d.date,
     trainer: d.trainer,
     traineeIds: attendees,
-    topicIds: [...d.topicIds],
+    topicIds: [...new Set([...d.topicIds, ...points.map((p) => p.topicId)])],
     newMarks,
     existingPreserved: kept,
   });
-  return `Session saved · ${newMarks} topic marks${kept ? ` · ${kept} existing marks preserved` : ''}`;
+  return `Session saved · ${newMarks} topic marks${pointMarks ? ` · ${pointMarks} subtopic marks` : ''}${kept ? ` · ${kept} existing marks preserved` : ''}`;
 }
 
 function findMe(S: State, kind: Kind, id: string): Me | null {
@@ -301,6 +315,18 @@ export function PortalProvider({ children }: { children: ReactNode }) {
             await reload();
             return;
           }
+          // the progress_points table has not been added yet: save the topics, tell the user the subtopics were not stored
+          if (isPointsTableError(e)) {
+            pointsTable.ok = false;
+            try {
+              await pushDiff(prev, next);
+              toast('Saved, but the subtopic records could not be stored: add the progress_points table to the database (supabase/progress-points.sql)');
+            } catch (e2) {
+              toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
+            }
+            await reload();
+            return;
+          }
           toast(`Could not save: ${e instanceof Error ? e.message : 'unknown error'}`);
           await reload();
         });
@@ -419,6 +445,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const undoSession: Ctx['undoSession'] = (id) => {
       update((s) => {
         for (const [k, r] of Object.entries(s.progress)) if (r.sessionId === id) delete s.progress[k];
+        for (const [k, r] of Object.entries(s.points)) if (r.sessionId === id) delete s.points[k];
         s.sessions = s.sessions.filter((x) => x.id !== id);
       });
       toast('Session undone · its marks were removed');
@@ -442,6 +469,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         keepAsUser(s, [id]);
         s.assignments = s.assignments.filter((a) => a.traineeId !== id);
         for (const k of Object.keys(s.progress)) if (k.startsWith(id + '|')) delete s.progress[k];
+        for (const k of Object.keys(s.points)) if (k.startsWith(id + '|')) delete s.points[k];
       });
       toast('Trainee removed. They stay in the user list.');
     };
@@ -453,6 +481,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         keepAsUser(s, ids);
         s.assignments = s.assignments.filter((a) => !gone.has(a.traineeId));
         for (const k of Object.keys(s.progress)) if (gone.has(k.split('|')[0])) delete s.progress[k];
+        for (const k of Object.keys(s.points)) if (gone.has(k.split('|')[0])) delete s.points[k];
       });
       toast(`${ids.length} ${ids.length === 1 ? 'trainee' : 'trainees'} removed`);
     };
@@ -472,6 +501,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         dropAssessments(s, new Set([id]));
         s.assignments = s.assignments.filter((a) => a.courseId !== id);
         for (const k of Object.keys(s.progress)) if (k.split('|')[1] === id) delete s.progress[k];
+        for (const k of Object.keys(s.points)) if (k.split('|')[1] === id) delete s.points[k];
       });
       toast('Course removed');
     };
