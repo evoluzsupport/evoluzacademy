@@ -73,7 +73,7 @@ export default function MyAssessmentsPage() {
                     <>
                       <Pill kind={r.status === 'in-progress' ? 'progress' : 'neutral'}>{r.status === 'in-progress' ? 'In progress' : 'Not started'}</Pill>{' '}
                       <button className="btn primary" disabled={busy} onClick={() => (r.status === 'in-progress' ? setTaking(r.id) : void start(r))}>
-                        {r.status === 'in-progress' ? 'Resume' : 'Start'}
+                        {r.status === 'in-progress' ? 'Resume Exam' : 'Start Exam'}
                       </button>
                     </>
                   )}

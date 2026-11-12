@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { usePortal } from '@/lib/store';
-import { courseById, examTakerById, isAssigned, learners } from '@/lib/selectors';
+import { courseById, examTakerById, learners } from '@/lib/selectors';
 import { Avatar, Empty, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
 import { AssessmentForm, FeedbackForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
 import { fmtDate, today, uid } from '@/lib/util';
@@ -99,41 +99,39 @@ export default function AssessmentsPage() {
 function AssignTab({ initial }: { initial: string }) {
   const { S, update, toast } = usePortal();
   const [aid, setAid] = useState(initial);
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [userId, setUserId] = useState('');
   const [due, setDue] = useState('');
-  const [who, setWho] = useState<'trainee' | 'trainer'>('trainee');
   const a = S.assessments.find((x) => x.id === aid);
 
-  // trainees must have been given the assessment's course; trainers can sit any assessment. Nobody gets the same one twice.
-  const eligible = useMemo(() => {
-    if (!a) return [];
-    const has = (id: string) => S.assessmentAssigns.some((r) => r.assessmentId === a.id && r.traineeId === id);
-    const pool: { id: string; name: string; tone: string }[] =
-      who === 'trainer' ? S.trainers : learners(S).filter((t) => isAssigned(S, t.id, a.courseId));
-    return pool.filter((t) => !has(t.id)).sort((x, y) => x.name.localeCompare(y.name));
-  }, [S, a, who]);
-  const noun = who === 'trainer' ? 'trainer' : 'trainee';
-  const toggle = (id: string) => setChosen((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  // anyone, trainee or trainer, who does not already have this assessment
+  const { trainees, trainers } = useMemo(() => {
+    const has = (id: string) => !!a && S.assessmentAssigns.some((r) => r.assessmentId === a.id && r.traineeId === id);
+    const byName = (x: { name: string }, y: { name: string }) => x.name.localeCompare(y.name);
+    return {
+      trainees: learners(S).filter((t) => !has(t.id)).sort(byName),
+      trainers: S.trainers.filter((t) => !has(t.id)).sort(byName),
+    };
+  }, [S, a]);
+  const picked = examTakerById(S, userId);
 
   const go = () => {
     if (!a) return;
-    if (!chosen.length) return toast('Pick at least one trainee');
+    if (!picked) return toast('Choose the exam user');
     if (due && due < today()) return toast('Due date cannot be in the past');
     update((s) => {
-      for (const t of chosen)
-        s.assessmentAssigns.push({ id: uid('aa-'), assessmentId: a.id, traineeId: t, assignedOn: today(), due, status: 'assigned', startedAt: '', submittedAt: '', score: null, total: null, answers: {} });
+      s.assessmentAssigns.push({ id: uid('aa-'), assessmentId: a.id, traineeId: picked.id, assignedOn: today(), due, status: 'assigned', startedAt: '', submittedAt: '', score: null, total: null, answers: {} });
     });
-    toast(`Assessment assigned to ${chosen.length} ${chosen.length === 1 ? noun : noun + 's'}`);
-    setChosen([]);
+    toast(`Assessment assigned to ${picked.name}`);
+    setUserId('');
   };
 
   return (
     <section className="card section-card">
-      <SectionTitle title="Assign assessment" sub="They see it under My Assessments and take it in the time allowed" />
+      <SectionTitle title="Assign assessment" sub="The exam user sees it under My Assessments and starts it with Start Exam" />
       <div className="form-grid" style={{ maxWidth: 640 }}>
         <div className="field full">
           <label>Assessment</label>
-          <select value={aid} onChange={(e) => { setAid(e.target.value); setChosen([]); }}>
+          <select value={aid} onChange={(e) => { setAid(e.target.value); setUserId(''); }}>
             <option value="">Select assessment…</option>
             {S.assessments.map((x) => <option key={x.id} value={x.id}>{x.title} — {courseById(S, x.courseId)?.name} ({maxMarks(x)} marks, {durationLabel(x.durationMin)})</option>)}
           </select>
@@ -141,32 +139,13 @@ function AssignTab({ initial }: { initial: string }) {
         {a && (
           <>
             <div className="field full">
-              <label>Who will take the exam?</label>
-              <div style={{ display: 'flex', gap: 18 }} role="radiogroup" aria-label="Who will take the exam">
-                {(['trainee', 'trainer'] as const).map((k) => (
-                  <label key={k} style={{ display: 'flex', gap: 6, alignItems: 'center', textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
-                    <input type="radio" name="exam-who" checked={who === k} onChange={() => { setWho(k); setChosen([]); }} /> {k === 'trainee' ? 'Trainee' : 'Trainer'}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="field full">
-              <label>{who === 'trainer' ? 'Trainers' : `Trainees on ${courseById(S, a.courseId)?.name}`}</label>
-              {eligible.length ? (
-                <div style={{ border: '1px solid var(--line)', borderRadius: 10, maxHeight: 260, overflow: 'auto', padding: 6 }}>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 6, fontWeight: 700, textTransform: 'none', letterSpacing: 0 }}>
-                    <input type="checkbox" checked={chosen.length === eligible.length} onChange={(e) => setChosen(e.target.checked ? eligible.map((t) => t.id) : [])} /> Select all
-                  </label>
-                  {eligible.map((t) => (
-                    <label key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 6, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
-                      <input type="checkbox" checked={chosen.includes(t.id)} onChange={() => toggle(t.id)} />
-                      <Avatar name={t.name} tone={t.tone} /> {t.name}
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <small className="subtle">{who === 'trainer' ? 'Every trainer already has this assessment.' : 'Everyone assigned this course already has this assessment, or nobody has been given the course yet.'}</small>
-              )}
+              <label>Exam User Name</label>
+              <select value={userId} onChange={(e) => setUserId(e.target.value)}>
+                <option value="">Select exam user…</option>
+                {!!trainees.length && <optgroup label="Trainees">{trainees.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>}
+                {!!trainers.length && <optgroup label="Trainers">{trainers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>}
+              </select>
+              {!trainees.length && !trainers.length && <small className="subtle">Everyone already has this assessment.</small>}
             </div>
             <div className="field"><label>Due date</label><input type="date" min={today()} value={due} onChange={(e) => setDue(e.target.value)} /></div>
           </>
@@ -174,7 +153,7 @@ function AssignTab({ initial }: { initial: string }) {
       </div>
       {a && (
         <div style={{ marginTop: 14 }}>
-          <button className="btn primary" onClick={go} disabled={!chosen.length}>Assign to {chosen.length || ''} {chosen.length === 1 ? noun : noun + 's'}</button>
+          <button className="btn primary" onClick={go} disabled={!userId}>Assign{picked ? ` to ${picked.name}` : ''}</button>
         </div>
       )}
     </section>
