@@ -3,9 +3,9 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
 import type { Assessment, AssessmentAssign, Question } from '@/lib/types';
-import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES } from '@/lib/csv';
-import { uid } from '@/lib/util';
-import { traineeById } from '@/lib/selectors';
+import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES, slug } from '@/lib/csv';
+import { today, uid } from '@/lib/util';
+import { isAssigned, learners, traineeById } from '@/lib/selectors';
 import { FormActions } from './ui';
 
 export const DURATIONS = [60, 65, 70, 75, 80, 85, 90];
@@ -14,6 +14,14 @@ export const maxMarks = (a: Assessment) => a.questions.reduce((n, q) => n + q.ma
 export const percent = (r: AssessmentAssign) => (r.total ? Math.round(((r.score ?? 0) / r.total) * 100) : 0);
 
 const blank = (): Question => ({ id: uid('q-'), text: '', options: ['', '', '', ''], answer: 0, marks: 1 });
+
+/** Reads a chosen option from a cell: a letter (A-F), a 1-based number, or the option's own text. -1 when it cannot be read. */
+const choiceIndex = (raw: string, options: string[]) => {
+  const v = raw.trim();
+  if (!v) return -1;
+  const i = /^[a-f]$/i.test(v) ? v.toUpperCase().charCodeAt(0) - 65 : /^\d+$/.test(v) ? Number(v) - 1 : options.findIndex((o) => o.trim().toLowerCase() === v.toLowerCase());
+  return i >= 0 && i < options.length ? i : -1;
+};
 
 /** Turns the rows of an uploaded template into questions; rows that cannot be read are counted, not added. */
 function fromCSV(text: string): { questions: Question[]; skipped: number } {
@@ -24,7 +32,7 @@ function fromCSV(text: string): { questions: Question[]; skipped: number } {
     const q = (field(r, 'Question') ?? '').trim();
     const options = ['Option A', 'Option B', 'Option C', 'Option D', 'Option E', 'Option F'].map((k) => (field(r, k) ?? '').trim()).filter(Boolean);
     const raw = (field(r, 'Correct Answer', 'Answer') ?? '').trim();
-    const answer = /^[a-f]$/i.test(raw) ? raw.toUpperCase().charCodeAt(0) - 65 : /^\d+$/.test(raw) ? Number(raw) - 1 : options.findIndex((o) => o.toLowerCase() === raw.toLowerCase());
+    const answer = choiceIndex(raw, options);
     const marks = Number(field(r, 'Marks', 'Mark')) || 1;
     if (!q || options.length < 2 || answer < 0 || answer >= options.length || marks < 1) {
       skipped++;
@@ -44,6 +52,7 @@ export function AssessmentForm({ id }: { id?: string }) {
   const [description, setDescription] = useState(ex?.description ?? '');
   const [qs, setQs] = useState<Question[]>(ex?.questions.length ? ex.questions : [blank()]);
   const file = useRef<HTMLInputElement>(null);
+  const keyFile = useRef<HTMLInputElement>(null);
   const total = qs.reduce((n, q) => n + (q.marks > 0 ? q.marks : 0), 0);
 
   const setQ = (i: number, patch: Partial<Question>) => setQs((p) => p.map((q, j) => (j === i ? { ...q, ...patch } : q)));
@@ -54,6 +63,26 @@ export function AssessmentForm({ id }: { id?: string }) {
     if (!questions.length) return toast('No valid questions found in that file');
     setQs((p) => [...p.filter((q) => q.text.trim()), ...questions]);
     toast(`${questions.length} ${questions.length === 1 ? 'question' : 'questions'} imported${skipped ? `, ${skipped} skipped` : ''}`);
+  };
+
+  /** Sets the correct answer of questions already in the form from a CSV (Question or Q No, plus Correct Answer). */
+  const importKey = async (f: File) => {
+    const rows = parseCSV(await f.text());
+    const next = qs.map((q) => ({ ...q }));
+    let updated = 0;
+    let skipped = 0;
+    rows.forEach((r, n) => {
+      const text = (field(r, 'Question') ?? '').trim().toLowerCase();
+      const no = Number((field(r, 'Q No', 'No', 'Question No', 'S No') ?? '').replace(/\D/g, ''));
+      const q = (text && next.find((x) => x.text.trim().toLowerCase() === text)) || (no ? next[no - 1] : !text ? next[n] : undefined);
+      const i = q ? choiceIndex(field(r, 'Correct Answer', 'Answer') ?? '', q.options) : -1;
+      if (!q || i < 0 || !q.options[i]?.trim()) return void skipped++;
+      q.answer = i;
+      updated++;
+    });
+    if (!updated) return toast('No answers matched the questions in this assessment');
+    setQs(next);
+    toast(`${updated} ${updated === 1 ? 'answer' : 'answers'} updated${skipped ? `, ${skipped} skipped` : ''}`);
   };
 
   const submit = (e: FormEvent) => {
@@ -110,9 +139,11 @@ export function AssessmentForm({ id }: { id?: string }) {
           <div className="actions">
             <button type="button" className="btn soft" onClick={() => downloadCSV([QUESTION_COLUMNS, ...QUESTION_SAMPLES], 'evoluz-assessment-template.csv')}>⇩ Template</button>
             <button type="button" className="btn soft" onClick={() => file.current?.click()}>↑ Import questions</button>
+            <button type="button" className="btn soft" title="Upload a CSV with Question (or Q No) and Correct Answer to set the answers of the questions below" onClick={() => keyFile.current?.click()}>↑ Import answers</button>
           </div>
         </div>
         <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importFile(f); }} />
+        <input ref={keyFile} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importKey(f); }} />
 
         <div style={{ display: 'grid', gap: 12 }}>
           {qs.map((q, i) => (
@@ -177,6 +208,75 @@ export function ResultReview({ assignId }: { assignId: string }) {
         })}
       </div>
       <div className="modal-actions"><button className="btn" onClick={closeModal}>Close</button></div>
+    </>
+  );
+}
+
+/** Upload what each trainee chose (one row per trainee); answers are scored against the answer key and saved as submitted results. */
+export function ImportResultsForm({ id }: { id: string }) {
+  const { S, update, closeModal, toast } = usePortal();
+  const file = useRef<HTMLInputElement>(null);
+  const a = S.assessments.find((x) => x.id === id);
+  if (!a) return <p>Not found.</p>;
+
+  const template = () =>
+    downloadCSV(
+      [['Email', 'Name', ...a.questions.map((_, i) => `Q${i + 1}`)], ['asha.verma@evoluz.tech', 'Asha Verma', ...a.questions.map((q, i) => String.fromCharCode(65 + (i % q.options.length)))]],
+      `${slug(a.title) || 'assessment'}-answers-template.csv`
+    );
+
+  const run = async (f: File) => {
+    const rows = parseCSV(await f.text());
+    if (!rows.length) return toast('No rows found in that file');
+    const people = learners(S);
+    const results: { traineeId: string; answers: Record<string, number>; score: number }[] = [];
+    const problems: string[] = [];
+    const seen = new Set<string>();
+    rows.forEach((r, n) => {
+      const email = (field(r, 'Email') ?? '').trim().toLowerCase();
+      const name = (field(r, 'Name', 'Trainee') ?? '').trim().toLowerCase();
+      const t = people.find((p) => (email && p.email.toLowerCase() === email) || (!email && name && p.name.trim().toLowerCase() === name));
+      const label = email || name || `row ${n + 2}`;
+      if (!t) return void problems.push(`${label}: trainee not found`);
+      if (!isAssigned(S, t.id, a.courseId)) return void problems.push(`${t.name}: not assigned to this course`);
+      if (seen.has(t.id)) return void problems.push(`${t.name}: listed twice`);
+      if (S.assessmentAssigns.some((x) => x.assessmentId === a.id && x.traineeId === t.id && x.status === 'submitted')) return void problems.push(`${t.name}: already submitted`);
+      const answers: Record<string, number> = {};
+      let score = 0;
+      a.questions.forEach((q, i) => {
+        const k = choiceIndex(field(r, `Q${i + 1}`) ?? '', q.options);
+        if (k < 0) return;
+        answers[q.id] = k;
+        if (k === q.answer) score += q.marks;
+      });
+      if (!Object.keys(answers).length) return void problems.push(`${t.name}: no readable answers`);
+      seen.add(t.id);
+      results.push({ traineeId: t.id, answers, score });
+    });
+    if (!results.length) return toast(problems[0] ? `Nothing imported. ${problems[0]}` : 'Nothing imported');
+    const at = new Date().toISOString();
+    update((s) => {
+      for (const x of results) {
+        const rec = s.assessmentAssigns.find((r) => r.assessmentId === a.id && r.traineeId === x.traineeId);
+        const done = { status: 'submitted' as const, startedAt: at, submittedAt: at, score: x.score, total: maxMarks(a), answers: x.answers };
+        if (rec) Object.assign(rec, done);
+        else s.assessmentAssigns.push({ id: uid('aa-'), assessmentId: a.id, traineeId: x.traineeId, assignedOn: today(), due: '', ...done });
+      }
+    });
+    toast(`${results.length} ${results.length === 1 ? 'result' : 'results'} imported${problems.length ? `, ${problems.length} skipped (${problems.slice(0, 2).join('; ')}${problems.length > 2 ? '…' : ''})` : ''}`);
+    closeModal();
+  };
+
+  return (
+    <>
+      <h2>Import answers</h2>
+      <p>{a.title}. Upload a CSV with one row per trainee: their <b>Email</b> (or Name) and the option they chose for each question in columns <b>Q1</b> to <b>Q{a.questions.length}</b> (A, B, C… or the option text). Answers are scored with the answer key and added to the Assessment report as submitted. Trainees who already submitted are skipped.</p>
+      <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void run(f); }} />
+      <div className="modal-actions">
+        <button type="button" className="btn" onClick={closeModal}>Cancel</button>
+        <button type="button" className="btn soft" onClick={template}>⇩ Template</button>
+        <button type="button" className="btn primary" onClick={() => file.current?.click()}>↑ Choose CSV</button>
+      </div>
     </>
   );
 }

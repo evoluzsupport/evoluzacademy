@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { usePortal } from '@/lib/store';
 import { courseById, isAssigned, learners, traineeById } from '@/lib/selectors';
 import { Avatar, Empty, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
-import { AssessmentForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
+import { AssessmentForm, ImportResultsForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
 import { fmtDate, today, uid } from '@/lib/util';
 
 type Tab = 'list' | 'assign' | 'report';
@@ -63,6 +63,7 @@ export default function AssessmentsPage() {
                       <td>
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
                           <button className="btn soft" onClick={() => { setTab('assign'); setPick(a.id); }}>Assign</button>
+                          <button className="btn soft" onClick={() => openModal(<ImportResultsForm id={a.id} />)}>Import answers</button>
                           <button className="btn" onClick={() => openModal(<AssessmentForm id={a.id} />, true)}>Edit</button>
                           <button
                             className="btn"
