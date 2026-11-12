@@ -36,7 +36,7 @@ function Tracker() {
     <>
       <PageHead
         title={isTrainee ? 'My Course' : 'Training tracker'}
-        desc={isTrainee ? 'Your courses, assigned trainers and progress. Your trainer updates your topics as you complete them.' : 'Individual topic status, actual trainer, and editable completion date.'}
+        desc={isTrainee ? 'Your courses, assigned trainers and progress. Mark each topic as covered after your session on it.' : 'Individual topic status, actual trainer, and editable completion date.'}
         actions={!isTrainee && <Link className="btn primary" href="/session">＋ Log a group session</Link>}
       />
       <section className="card detail-panel" style={{ marginBottom: 16 }}>
@@ -104,8 +104,8 @@ function Tracker() {
         <div className="detail-layout">
           <section className="card detail-panel">
             <SectionTitle title={`${c.name} · ${topics.length} topics`} right={<span className="subtle">{done} complete · {topics.length - done} remaining</span>} />
-            {topics.map((x) => <TopicRow key={`${t.id}-${c.id}-${x.id}`} traineeId={t.id} course={c} topic={x} editable={!isTrainee} />)}
-            {isTrainee && <p className="readonly-note">View only. Your trainer marks topics as they are completed in your sessions.</p>}
+            {topics.map((x) => <TopicRow key={`${t.id}-${c.id}-${x.id}`} traineeId={t.id} course={c} topic={x} editable={!isTrainee} selfLog={isTrainee} />)}
+            {isTrainee && <p className="readonly-note">Log your own session: tick the points you covered, then press Mark Topic Covered. Once covered, only the trainer who delivered it or an admin can change it.</p>}
           </section>
           <aside className="grid" style={{ alignContent: 'start' }}>
             <section className="card detail-panel">
