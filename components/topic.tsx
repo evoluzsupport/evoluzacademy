@@ -6,11 +6,11 @@ import { canEditCompletion, nameMatches, topicKey, trainerNames } from '@/lib/se
 import type { Course, Topic } from '@/lib/types';
 import { fmtDate, today } from '@/lib/util';
 
-/** Splits manual text into short points: new lines, semicolons and sentence ends. */
-const bullets = (v?: string) =>
+/** Splits manual text into short points: new lines, semicolons and sentence ends, plus commas when `commas` is set (not inside numbers like 1,000). */
+const bullets = (v?: string, commas = false) =>
   String(v || '')
-    .split(/\n+|;\s*|(?<=[.!?])\s+(?=[A-Z0-9])/)
-    .map((x) => x.trim().replace(/[.;]+$/, ''))
+    .split(commas ? /\n+|;\s*|(?<!\d),\s*|,(?!\d)\s*|(?<=[.!?])\s+(?=[A-Z0-9])/ : /\n+|;\s*|(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((x) => x.trim().replace(/[.;,]+$/, ''))
     .filter(Boolean);
 
 /** "What we cover" and "Activity" as two labelled bullet lists. */
@@ -28,7 +28,7 @@ export function TopicDetails({
   onCheck?: (index: number, on: boolean) => void;
   disabled?: boolean;
 }) {
-  const c = bullets(cover);
+  const c = bullets(cover, true);
   const a = bullets(activity);
   if (!c.length && !a.length) return null;
   return (
