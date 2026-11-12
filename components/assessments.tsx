@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { usePortal } from '@/lib/store';
-import type { Assessment, AssessmentAssign, Question } from '@/lib/types';
+import type { Assessment, AssessmentAssign, Question, State } from '@/lib/types';
 import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES, slug } from '@/lib/csv';
 import { uid } from '@/lib/util';
 import { examTakerById } from '@/lib/selectors';
@@ -280,32 +280,23 @@ export function ResultReview({ assignId }: { assignId: string }) {
   );
 }
 
-/** Give the score and written feedback to someone who sat the assessment. */
-export function FeedbackForm({ id }: { id: string }) {
+/** Score and feedback for one person's result, opened from a row of the Assessment report. */
+export function FeedbackForm({ assignId }: { assignId: string }) {
   const { S, update, closeModal, toast } = usePortal();
-  const a = S.assessments.find((x) => x.id === id);
-  const rows = S.assessmentAssigns.filter((r) => r.assessmentId === id).map((r) => ({ r, p: examTakerById(S, r.traineeId) })).filter((x) => x.p);
-  const [who, setWho] = useState(rows[0]?.r.id ?? '');
-  const cur = rows.find((x) => x.r.id === who)?.r;
-  const [score, setScore] = useState(cur?.status === 'submitted' && cur.score != null ? String(cur.score) : '');
-  const [text, setText] = useState(cur?.feedback ?? '');
-  if (!a) return <p>Not found.</p>;
+  const r = S.assessmentAssigns.find((x) => x.id === assignId);
+  const a = r && S.assessments.find((x) => x.id === r.assessmentId);
+  const p = r && examTakerById(S, r.traineeId);
+  const [score, setScore] = useState(r?.status === 'submitted' && r.score != null ? String(r.score) : '');
+  const [text, setText] = useState(r?.feedback ?? '');
+  if (!r || !a) return <p>Not found.</p>;
   const max = maxMarks(a);
-
-  const pickPerson = (rid: string) => {
-    const r = rows.find((x) => x.r.id === rid)?.r;
-    setWho(rid);
-    setScore(r?.status === 'submitted' && r.score != null ? String(r.score) : '');
-    setText(r?.feedback ?? '');
-  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!cur) return toast('Choose who took the exam');
     const n = Number(score);
     if (score.trim() === '' || !Number.isFinite(n) || n < 0 || n > max) return toast(`Score must be between 0 and ${max}`);
     update((s) => {
-      const rec = s.assessmentAssigns.find((x) => x.id === cur.id);
+      const rec = s.assessmentAssigns.find((x) => x.id === r.id);
       if (!rec) return;
       rec.score = Math.round(n);
       rec.total = max;
@@ -324,33 +315,66 @@ export function FeedbackForm({ id }: { id: string }) {
   return (
     <>
       <h2>Feedback</h2>
-      <p>{a.title} · out of {max} marks. The score shows in the Assessment report and the feedback is shown to the person who took the exam.</p>
-      {!rows.length ? (
-        <>
-          <p className="subtle">This assessment has not been assigned to anyone yet. Use Assign first.</p>
-          <div className="modal-actions"><button type="button" className="btn" onClick={closeModal}>Close</button></div>
-        </>
-      ) : (
-        <form onSubmit={submit}>
-          <div className="form-grid">
-            <div className="field full">
-              <label>Exam taken by</label>
-              <select value={who} onChange={(e) => pickPerson(e.target.value)}>
-                {rows.map(({ r, p }) => <option key={r.id} value={r.id}>{p!.name} ({p!.role}){r.status === 'submitted' ? ` · ${r.score}/${r.total}` : ''}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label>Score (out of {max})</label>
-              <input type="number" min={0} max={max} step={1} value={score} onChange={(e) => setScore(e.target.value)} required placeholder={`0 – ${max}`} />
-            </div>
-            <div className="field full">
-              <label>Feedback</label>
-              <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write feedback for the person who took the exam" />
-            </div>
+      <p>{a.title} · {p?.name ?? 'Exam user'} · out of {max} marks. The score shows in the Assessment report and the feedback is shown to the person who took the exam.</p>
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          <div className="field">
+            <label>Score (out of {max})</label>
+            <input type="number" min={0} max={max} step={1} value={score} onChange={(e) => setScore(e.target.value)} required placeholder={`0 – ${max}`} />
           </div>
-          <FormActions onCancel={closeModal} save="Save feedback" />
-        </form>
-      )}
+          <div className="field full">
+            <label>Feedback</label>
+            <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write feedback for the person who took the exam" />
+          </div>
+        </div>
+        <FormActions onCancel={closeModal} save="Save feedback" />
+      </form>
     </>
   );
+}
+
+const SHEET_COLUMNS = ['Assignment ID', 'Trainee', 'Q No', 'Type', 'Question', 'Marks', 'Answer Given', 'Correct Answer', 'Marks Awarded', 'Feedback'];
+
+/** Downloads one person's answer sheet: every question with the answer given, ready to be checked offline and imported back. */
+export function exportAnswerSheet(S: State, r: AssessmentAssign) {
+  const a = S.assessments.find((x) => x.id === r.assessmentId);
+  if (!a) return;
+  const who = examTakerById(S, r.traineeId)?.name ?? 'Trainee';
+  const opt = (q: Question, i: number | undefined) => (typeof i === 'number' && q.options[i] !== undefined ? `${String.fromCharCode(65 + i)}. ${q.options[i]}` : '');
+  const rows = a.questions.map((q, i) => {
+    const v = r.answers[q.id];
+    const written = isWritten(q);
+    const awarded = written ? r.writtenMarks?.[q.id] ?? '' : v === q.answer ? q.marks : 0;
+    return [r.id, who, i + 1, written ? 'Written' : 'MCQ', q.text, q.marks, written ? (typeof v === 'string' ? v : '') : opt(q, typeof v === 'number' ? v : undefined), written ? '' : opt(q, q.answer), awarded, i === 0 ? r.feedback ?? '' : ''];
+  });
+  downloadCSV([SHEET_COLUMNS, ...rows], `${slug(a.title) || 'exam'}-${slug(who) || 'answer'}-answer-sheet.csv`);
+}
+
+/** Reads a checked answer sheet: marks for written answers (multiple choice is scored from the key) and optional feedback. */
+export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { error: string } | { written: Record<string, number>; feedback: string | undefined; score: number; total: number } {
+  const a = S.assessments.find((x) => x.id === r.assessmentId);
+  if (!a) return { error: 'Assessment not found' };
+  const rows = parseCSV(text);
+  if (!rows.length) return { error: 'No rows found in that file' };
+  const written: Record<string, number> = { ...(r.writtenMarks ?? {}) };
+  let feedback: string | undefined;
+  let matched = 0;
+  for (const row of rows) {
+    const aid = (field(row, 'Assignment ID') ?? '').trim();
+    if (aid && aid !== r.id) return { error: 'This sheet belongs to a different exam result' };
+    const fb = (field(row, 'Feedback') ?? '').trim();
+    if (fb && feedback === undefined) feedback = fb;
+    const no = Number((field(row, 'Q No', 'No') ?? '').replace(/\D/g, ''));
+    const q = no ? a.questions[no - 1] : undefined;
+    if (!q) continue;
+    matched++;
+    if (!isWritten(q)) continue;
+    const raw = (field(row, 'Marks Awarded', 'Marks Given') ?? '').trim();
+    if (raw === '') continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > q.marks) return { error: `Q${no}: marks awarded must be between 0 and ${q.marks}` };
+    written[q.id] = n;
+  }
+  if (!matched) return { error: 'No questions matched. Use the sheet exported from this result' };
+  return { written, feedback, score: resultScore(a, r.answers, written), total: maxMarks(a) };
 }

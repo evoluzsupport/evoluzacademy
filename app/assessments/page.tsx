@@ -1,9 +1,9 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { usePortal } from '@/lib/store';
 import { courseById, examTakerById, learners } from '@/lib/selectors';
 import { Avatar, Empty, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
-import { AssessmentForm, FeedbackForm, ResultReview, durationLabel, maxMarks, percent } from '@/components/assessments';
+import { AssessmentForm, FeedbackForm, ResultReview, exportAnswerSheet, readAnswerSheet, durationLabel, maxMarks, percent } from '@/components/assessments';
 import { fmtDate, today, uid } from '@/lib/util';
 
 type Tab = 'list' | 'assign' | 'report';
@@ -63,7 +63,6 @@ export default function AssessmentsPage() {
                       <td>
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
                           <button className="btn soft" onClick={() => { setTab('assign'); setPick(a.id); }}>Assign</button>
-                          <button className="btn soft" onClick={() => openModal(<FeedbackForm id={a.id} />)}>Feedback</button>
                           <button className="btn" onClick={() => openModal(<AssessmentForm id={a.id} />, true)}>Edit</button>
                           <button
                             className="btn"
@@ -164,10 +163,27 @@ function ReportTab() {
   const { S, openModal, update, confirm, toast } = usePortal();
   const [course, setCourse] = useState('');
   const [status, setStatus] = useState('');
+  const sheet = useRef<HTMLInputElement>(null);
+  const [sheetFor, setSheetFor] = useState('');
   const rows = S.assessmentAssigns
     .map((r) => ({ r, a: S.assessments.find((x) => x.id === r.assessmentId), t: examTakerById(S, r.traineeId) }))
     .filter((x) => x.a && x.t && (!course || x.a.courseId === course) && (!status || x.r.status === status))
     .sort((x, y) => (y.r.submittedAt || y.r.assignedOn).localeCompare(x.r.submittedAt || x.r.assignedOn));
+  const importSheet = async (f: File) => {
+    const r = S.assessmentAssigns.find((x) => x.id === sheetFor);
+    if (!r) return;
+    const res = readAnswerSheet(S, r, await f.text());
+    if ('error' in res) return toast(res.error);
+    update((s) => {
+      const rec = s.assessmentAssigns.find((x) => x.id === r.id);
+      if (!rec) return;
+      rec.writtenMarks = res.written;
+      rec.score = res.score;
+      rec.total = res.total;
+      if (res.feedback !== undefined) rec.feedback = res.feedback;
+    });
+    toast(`Answer sheet imported. Score ${res.score}/${res.total} (${res.total ? Math.round((res.score / res.total) * 100) : 0}%)`);
+  };
   const done = rows.filter((x) => x.r.status === 'submitted');
   const avg = done.length ? Math.round(done.reduce((n, x) => n + percent(x.r), 0) / done.length) : 0;
 
@@ -188,6 +204,7 @@ function ReportTab() {
         <span className="pill active">{done.length} submitted</span>
         {!!done.length && <span className="pill progress">Average {avg}%</span>}
       </div>
+      <input ref={sheet} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importSheet(f); }} />
       {!rows.length ? (
         <Empty>No assessments have been assigned yet.</Empty>
       ) : (
@@ -208,6 +225,9 @@ function ReportTab() {
                   <td>
                     <div className="actions" style={{ justifyContent: 'flex-end' }}>
                       {r.status === 'submitted' && <button className="btn soft" onClick={() => openModal(<ResultReview assignId={r.id} />, true)}>Review</button>}
+                      <button className="btn soft" onClick={() => openModal(<FeedbackForm assignId={r.id} />)}>Feedback</button>
+                      {r.status === 'submitted' && <button className="btn" title="Download the answer sheet to check offline" onClick={() => exportAnswerSheet(S, r)}>⇩ Export sheet</button>}
+                      {r.status === 'submitted' && <button className="btn" title="Upload the checked answer sheet; the score is updated automatically" onClick={() => { setSheetFor(r.id); sheet.current?.click(); }}>↑ Import sheet</button>}
                       <button
                         className="btn"
                         onClick={() =>
