@@ -183,8 +183,10 @@ const TABLES: Table[] = [
     name: 'assessment_assignments',
     pk: ['id'],
     order: ['id'],
-    rows: (s) =>
-      s.assessmentAssigns.map((a) => ({
+    // the feedback column is only written once someone has feedback, so saves keep working on a database that does not have it yet
+    rows: (s) => {
+      const withFeedback = s.assessmentAssigns.some((a) => a.feedback);
+      return s.assessmentAssigns.map((a) => ({
         id: a.id,
         assessment_id: a.assessmentId,
         trainee_id: a.traineeId,
@@ -197,8 +199,9 @@ const TABLES: Table[] = [
         total: a.total,
         answers: a.answers,
         written_marks: a.writtenMarks ?? {},
-        feedback: a.feedback ?? '',
-      })),
+        ...(withFeedback ? { feedback: a.feedback ?? '' } : {}),
+      }));
+    },
   },
 ];
 
