@@ -192,9 +192,13 @@ export function AssessmentForm({ id }: { id?: string }) {
   );
 }
 
-/** Marks a result is worth: multiple-choice by key plus the marks staff gave written answers. */
-export const resultScore = (a: Assessment, answers: Record<string, number | string>, written: Record<string, number> = {}) =>
-  a.questions.reduce((n, q) => n + (isWritten(q) ? Math.min(q.marks, Math.max(0, Number(written[q.id]) || 0)) : answers[q.id] === q.answer ? q.marks : 0), 0);
+/** Marks a result is worth. Marks staff gave a question (a checked answer sheet, or marking a written answer) win; otherwise multiple choice is scored from the key. */
+export const resultScore = (a: Assessment, answers: Record<string, number | string>, awarded: Record<string, number> = {}) =>
+  a.questions.reduce((n, q) => {
+    const given = awarded[q.id];
+    if (given !== undefined) return n + (Number(given) || 0);
+    return n + (!isWritten(q) && answers[q.id] === q.answer ? q.marks : 0);
+  }, 0);
 
 /** The trainee's answers next to the correct ones; written answers are marked here. */
 export function ResultReview({ assignId }: { assignId: string }) {
@@ -253,12 +257,12 @@ export function ResultReview({ assignId }: { assignId: string }) {
               </div>
             );
           }
-          const ok = pick === q.answer;
+          const got = r.writtenMarks?.[q.id] ?? (pick === q.answer ? q.marks : 0);
           return (
             <div key={q.id} className="card" style={{ padding: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <b style={{ fontSize: 12 }}>Q{i + 1}. {q.text}</b>
-                <span className={`pill ${ok ? 'active' : 'overdue'}`}>{ok ? q.marks : 0}/{q.marks}</span>
+                <span className={`pill ${got > 0 ? 'active' : 'overdue'}`}>{got}/{q.marks}</span>
               </div>
               <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12 }}>
                 {q.options.map((o, k) => (
@@ -344,39 +348,50 @@ export function exportAnswerSheet(S: State, r: AssessmentAssign) {
   const rows = a.questions.map((q, i) => {
     const v = r.answers[q.id];
     const written = isWritten(q);
-    const awarded = written ? r.writtenMarks?.[q.id] ?? '' : v === q.answer ? q.marks : 0;
+    const awarded = r.writtenMarks?.[q.id] ?? (written ? '' : v === q.answer ? q.marks : 0);
     return [r.id, who, i + 1, written ? 'Written' : 'MCQ', q.text, q.marks, written ? (typeof v === 'string' ? v : '') : opt(q, typeof v === 'number' ? v : undefined), written ? '' : opt(q, q.answer), awarded, i === 0 ? r.feedback ?? '' : ''];
   });
   downloadCSV([SHEET_COLUMNS, ...rows], `${slug(a.title) || 'exam'}-${slug(who) || 'answer'}-answer-sheet.csv`);
 }
 
-/** Reads a checked answer sheet: marks for written answers (multiple choice is scored from the key) and optional feedback. */
+/**
+ * Reads a checked answer sheet. The sheet alone decides the result: each row is matched by its Q No only, and the marks come from
+ * the Marks Awarded column (out of the row's Marks). The assessment's question types, answer key and marks are not used.
+ */
 export function readAnswerSheet(S: State, r: AssessmentAssign, text: string): { error: string } | { written: Record<string, number>; feedback: string | undefined; score: number; total: number } {
   const a = S.assessments.find((x) => x.id === r.assessmentId);
   if (!a) return { error: 'Assessment not found' };
   const rows = parseCSV(text);
   if (!rows.length) return { error: 'No rows found in that file' };
-  const written: Record<string, number> = { ...(r.writtenMarks ?? {}) };
+  const awarded: Record<string, number> = {};
   const remarks: { no: number; text: string }[] = [];
-  let matched = 0;
+  let score = 0;
+  let total = 0;
+  let allOut = true;
   for (const row of rows) {
     const aid = (field(row, 'Assignment ID') ?? '').trim();
     if (aid && aid !== r.id) return { error: 'This sheet belongs to a different exam result' };
-    const fb = (field(row, 'Feedback') ?? '').trim();
     const no = Number((field(row, 'Q No', 'No') ?? '').replace(/\D/g, ''));
+    if (!no) continue;
+    const q = a.questions[no - 1];
+    if (!q) return { error: `Q${no} does not exist in this assessment` };
+    const fb = (field(row, 'Feedback') ?? '').trim();
     if (fb) remarks.push({ no, text: fb });
-    const q = no ? a.questions[no - 1] : undefined;
-    if (!q) continue;
-    matched++;
-    if (!isWritten(q)) continue;
     const raw = (field(row, 'Marks Awarded', 'Marks Given') ?? '').trim();
-    if (raw === '') continue;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n < 0 || n > q.marks) return { error: `Q${no}: marks awarded must be between 0 and ${q.marks}` };
-    written[q.id] = n;
+    const got = raw === '' ? 0 : Number(raw);
+    const outOfRaw = (field(row, 'Marks') ?? '').trim();
+    const outOf = outOfRaw === '' ? NaN : Number(outOfRaw);
+    if (!Number.isFinite(got) || got < 0) return { error: `Q${no}: marks awarded must be a number, 0 or more` };
+    if (Number.isFinite(outOf) && got > outOf) return { error: `Q${no}: marks awarded (${got}) is more than the marks for the question (${outOf})` };
+    if (Number.isFinite(outOf)) total += outOf;
+    else allOut = false;
+    awarded[q.id] = got;
+    score += got;
   }
-  if (!matched) return { error: 'No questions matched. Use the sheet exported from this result' };
+  if (!Object.keys(awarded).length) return { error: 'No questions found. Use the sheet exported from this result' };
+  // questions missing from the sheet count as 0, so the sheet is the whole result
+  for (const q of a.questions) if (awarded[q.id] === undefined) awarded[q.id] = 0;
   // one remark is the overall feedback; remarks on several questions are kept as one line per question
   const feedback = !remarks.length ? undefined : remarks.length === 1 ? remarks[0].text : remarks.map((x) => `Q${x.no}: ${x.text}`).join('\n');
-  return { written, feedback, score: resultScore(a, r.answers, written), total: maxMarks(a) };
+  return { written: awarded, feedback, score, total: allOut && total > 0 ? total : r.total ?? maxMarks(a) };
 }
