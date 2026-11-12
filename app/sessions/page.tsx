@@ -37,14 +37,16 @@ export default function SessionsPage() {
   const exportCSV = () =>
     downloadCSV(
       [
-        ['Date', 'Course', 'Trainer', 'Attendees', 'Topics covered', 'New marks', 'Existing preserved'],
+        ['Date', 'Course', 'Trainer', 'Duration (min)', 'Attendees', 'Topics covered', 'Notes', 'Topics completed', 'Already completed'],
         ...list.map((s) => {
           return [
             s.date,
             s.courseName,
             s.trainer,
+            s.durationMin ?? '',
             s.traineeIds.map(personName).join('; '),
             topicNames(s).join('; '),
+            s.notes ?? '',
             s.newMarks,
             s.existingPreserved,
           ];
@@ -82,29 +84,31 @@ export default function SessionsPage() {
         </div>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Date</th><th>Course</th><th>Trainer</th><th>Attendees</th><th>Topics</th><th>Marks</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Course</th><th>Trainer</th><th>Duration</th><th>Attendees</th><th>Topics</th><th>Notes</th><th>Marks</th><th></th></tr></thead>
             <tbody>
               {list.map((s) => (
                 <tr key={s.id}>
                   <td>{fmtDate(s.date)}</td>
                   <td><b>{s.courseName}</b></td>
                   <td>{s.trainer}</td>
+                  <td>{s.durationMin ? `${s.durationMin} min` : '—'}</td>
                   <td>{s.traineeIds.map(personName).join(', ')}</td>
                   <td>{topicNames(s).join(', ')}</td>
+                  <td style={{ maxWidth: 240, whiteSpace: 'pre-wrap' }}>{s.notes || <span className="subtle">—</span>}</td>
                   <td>
-                    {s.newMarks} new{s.existingPreserved ? <span className="subtle"> · {s.existingPreserved} kept</span> : null}
+                    {s.newMarks} completed{s.existingPreserved ? <span className="subtle"> · {s.existingPreserved} already done</span> : null}
                   </td>
                   <td>
                     <button
                       className="btn"
-                      onClick={() => confirm('Undo this session? The completion marks it created will be removed.', () => undoSession(s.id), 'Undo session')}
+                      onClick={() => confirm('Undo this session? The marks and subtopic records it created will be removed. Other sessions are not affected.', () => undoSession(s.id), 'Undo session')}
                     >
                       Undo
                     </button>
                   </td>
                 </tr>
               ))}
-              {!list.length && <tr><td colSpan={7}><Empty>{filtering ? 'No sessions match these filters.' : 'No sessions logged yet. Use “Log a session” to record a group session.'}</Empty></td></tr>}
+              {!list.length && <tr><td colSpan={9}><Empty>{filtering ? 'No sessions match these filters.' : 'No sessions logged yet. Use “Log a session” to record a group session.'}</Empty></td></tr>}
             </tbody>
           </table>
         </div>

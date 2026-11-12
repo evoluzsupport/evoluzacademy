@@ -77,11 +77,57 @@ export function TopicDetails({
 }
 
 /**
- * One topic with its per-learner completion state; editable for trainers/admins.
- * With `selfLog` a trainee can log their own topic: tick the points covered, choose who delivered it and when, then mark it covered.
- * Once covered, only the trainer who delivered it (or an admin) can change it.
+ * Every session logged on a topic, newest first: date, trainer, duration, the subtopics delivered (and by whom) and the notes.
+ * With a traineeId it shows only the sessions that learner attended. Earlier sessions are never changed by later ones.
  */
-export function TopicRow({ traineeId, course, topic, editable: allowed, selfLog = false }: { traineeId: string; course: Course; topic: Topic; editable: boolean; selfLog?: boolean }) {
+export function TopicSessionLog({ courseId, topicId, cover, traineeId }: { courseId: string; topicId: string; cover?: string; traineeId?: string }) {
+  const { S } = usePortal();
+  const list = S.sessions
+    .filter((x) => x.courseId === courseId && x.topicIds.includes(topicId) && (!traineeId || x.traineeIds.includes(traineeId)))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  if (!list.length) return null;
+  const labels = coverPoints(cover);
+  return (
+    <details className="tsl" onClick={(e) => e.stopPropagation()}>
+      <summary>Session log · {list.length} {list.length === 1 ? 'session' : 'sessions'}</summary>
+      <ul>
+        {list.map((x) => {
+          // subtopics delivered in this session, one entry per subtopic and trainer
+          const seen = new Set<string>();
+          const delivered: { i: number; trainer: string }[] = [];
+          for (const [k, r] of Object.entries(S.points)) {
+            const [tid, cid, tp, idx] = k.split('|');
+            if (r.sessionId !== x.id || cid !== courseId || tp !== topicId || (traineeId && tid !== traineeId)) continue;
+            const id = `${idx}|${r.trainer}`;
+            if (!seen.has(id)) {
+              seen.add(id);
+              delivered.push({ i: Number(idx), trainer: r.trainer });
+            }
+          }
+          delivered.sort((a, b) => a.i - b.i);
+          const completedHere = Object.entries(S.progress).some(([k, r]) => r.sessionId === x.id && k.split('|')[1] === courseId && k.split('|')[2] === topicId && (!traineeId || k.startsWith(`${traineeId}|`)));
+          return (
+            <li key={x.id}>
+              <b>{fmtDate(x.date)}</b> · {x.trainer}
+              {x.durationMin ? ` · ${x.durationMin} min` : ''}
+              {completedHere && <span className="pill done" style={{ marginLeft: 6 }}>Topic covered</span>}
+              {delivered.length > 0 && (
+                <div className="tsl-pts">{delivered.map((d) => `${labels[d.i] ?? `Subtopic ${d.i + 1}`} (by ${d.trainer})`).join(' · ')}</div>
+              )}
+              {x.notes && <div className="tsl-notes">{x.notes}</div>}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+/**
+ * One topic with its per-learner completion state; editable for trainers/admins, view only for trainees.
+ * The "What we cover" boxes only show what was delivered (and by whom); sessions are logged on the Log a session page.
+ */
+export function TopicRow({ traineeId, course, topic, editable: allowed }: { traineeId: string; course: Course; topic: Topic; editable: boolean }) {
   const { S, me, toggleTopic, patchCompletion } = usePortal();
   const rec = S.progress[topicKey(traineeId, course.id, topic.id)];
   const done = !!rec?.done;
@@ -94,32 +140,16 @@ export function TopicRow({ traineeId, course, topic, editable: allowed, selfLog 
   const trainer = rec?.trainer ?? draftTrainer;
   const date = rec?.date ?? draftDate;
   const uidBase = `${traineeId}-${course.id}-${topic.id}`;
-  // points of "What we cover" the trainee has ticked off; kept in this browser so they survive a reload
-  const ptsKey = `evoluzPoints:${uidBase}`;
-  const [pts, setPts] = useState<Set<number>>(() => {
-    try {
-      return new Set<number>(JSON.parse(localStorage.getItem(ptsKey) || '[]'));
-    } catch {
-      return new Set<number>();
-    }
-  });
-  const tickPoint = (i: number, on: boolean) =>
-    setPts((p) => {
-      const n = new Set(p);
-      if (on) n.add(i);
-      else n.delete(i);
-      try {
-        localStorage.setItem(ptsKey, JSON.stringify([...n]));
-      } catch {}
-      return n;
-    });
-  const mine = selfLog && me?.id === traineeId;
   // subtopics already recorded for this learner (the whole topic counts as every subtopic), with who delivered each
-  const pointRec = (i: number) => S.points[`${topicKey(traineeId, course.id, topic.id)}|${i}`] ?? (done ? rec : undefined);
-  const recorded = new Set(coverPoints(topic.cover).map((_, i) => i).filter((i) => !!pointRec(i)));
+  const pointTrainers = (i: number) => {
+    const prefix = `${topicKey(traineeId, course.id, topic.id)}|${i}|`;
+    const names = Object.entries(S.points).filter(([k]) => k.startsWith(prefix)).map(([, r]) => r.trainer);
+    return [...new Set(names.length ? names : done && rec ? [rec.trainer] : [])];
+  };
+  const recorded = new Set(coverPoints(topic.cover).map((_, i) => i).filter((i) => pointTrainers(i).length > 0));
   const byWho = (i: number) => {
-    const t = pointRec(i)?.trainer;
-    return t ? <small className="covered-by" style={{ marginLeft: 24 }}>by {t}</small> : null;
+    const t = pointTrainers(i);
+    return t.length ? <small className="covered-by" style={{ marginLeft: 24 }}>by {t.join(', ')}</small> : null;
   };
 
   return (
@@ -141,31 +171,15 @@ export function TopicRow({ traineeId, course, topic, editable: allowed, selfLog 
         <TopicDetails
           cover={topic.cover}
           activity={topic.activity}
-          checked={mine ? pts : new Set<number>()}
-          onCheck={mine ? tickPoint : () => undefined}
+          checked={new Set<number>()}
+          onCheck={() => undefined}
           locked={recorded}
-          disabled={mine && done}
-          readOnly={!mine}
+          readOnly
           extra={byWho}
         />
+        <TopicSessionLog courseId={course.id} topicId={topic.id} cover={topic.cover} traineeId={traineeId} />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-          {mine && !done ? (
-            <>
-              <label className="subtle" htmlFor={`tr-${uidBase}`}>
-                Delivered by{' '}
-                <select id={`tr-${uidBase}`} className="select" style={{ padding: '5px 7px', fontSize: 10 }} value={trainer} onChange={(e) => setDraftTrainer(e.target.value)}>
-                  {trainerNames(S, trainer).map((n) => (
-                    <option key={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="subtle" htmlFor={`dt-${uidBase}`}>
-                Date{' '}
-                <input id={`dt-${uidBase}`} className="input" type="date" max={today()} style={{ padding: '5px 7px', fontSize: 10 }} value={date} onChange={(e) => setDraftDate(e.target.value)} />
-              </label>
-              <button type="button" className="btn soft" onClick={() => toggleTopic(traineeId, course.id, topic.id, trainer, date)}>Mark Topic Covered</button>
-            </>
-          ) : editable ? (
+          {editable ? (
             <>
               <label className="subtle" htmlFor={`tr-${uidBase}`}>
                 Delivered by{' '}

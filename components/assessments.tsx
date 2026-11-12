@@ -6,6 +6,7 @@ import type { Assessment, AssessmentAssign, Question, State } from '@/lib/types'
 import { downloadCSV, field, parseCSV, QUESTION_COLUMNS, QUESTION_SAMPLES, slug } from '@/lib/csv';
 import { uid } from '@/lib/util';
 import { examTakerById } from '@/lib/selectors';
+import { feedbackColumn } from '@/lib/sync';
 import { FormActions } from './ui';
 
 export const DURATIONS = [60, 65, 70, 75, 80, 85, 90];
@@ -323,7 +324,7 @@ export function FeedbackForm({ assignId }: { assignId: string }) {
         rec.submittedAt = at;
       }
     });
-    toast('Score and feedback saved');
+    toast(feedbackColumn.ok || !text.trim() ? 'Score and feedback saved' : 'Score saved, but the feedback text could not be stored: run supabase/assessments-drafts.sql');
     closeModal();
   };
 
