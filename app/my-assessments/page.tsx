@@ -4,7 +4,7 @@ import { usePortal } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
 import { courseById } from '@/lib/selectors';
 import { Empty, Guard, PageHead, Pill } from '@/components/ui';
-import { isWritten, maxMarks, percent } from '@/components/assessments';
+import { ResultReview, isGraded, isWritten, maxMarks, percent } from '@/components/assessments';
 import { fmtDate } from '@/lib/util';
 import type { Assessment, AssessmentAssign } from '@/lib/types';
 
@@ -12,7 +12,7 @@ const draftKey = (id: string) => `evoluzAssessment:${id}`;
 
 /** The trainee's own assessments: start one, answer it at your own pace, and see the result. An exam you start but do not finish stays as a draft. */
 export default function MyAssessmentsPage() {
-  const { S, me, toast, refresh } = usePortal();
+  const { S, me, toast, refresh, openModal } = usePortal();
   const [taking, setTaking] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -49,7 +49,7 @@ export default function MyAssessmentsPage() {
                   <h3 style={{ margin: 0 }}>{a.title}</h3>
                   <small className="subtle">{courseById(S, a.courseId)?.name} · {a.questions.length} questions · {maxMarks(a)} marks{r.due ? ` · due ${fmtDate(r.due)}` : ''}</small>
                   {a.description && <p style={{ margin: '8px 0 0' }}>{a.description}</p>}
-                  {r.status === 'submitted' && r.feedback && (
+                  {isGraded(r) && r.feedback && (
                     <div style={{ margin: '10px 0 0', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 8, background: '#f7f9fc' }}>
                       <b style={{ fontSize: 12 }}>Feedback</b>
                       <p style={{ margin: '4px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>{r.feedback}</p>
@@ -57,11 +57,17 @@ export default function MyAssessmentsPage() {
                   )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  {r.status === 'submitted' ? (
+                  {r.status === 'submitted' && !isGraded(r) ? (
+                    <>
+                      <Pill kind="progress">Result pending</Pill>
+                      <div><small className="subtle">Submitted {fmtDate(r.submittedAt.slice(0, 10))}. Your result will appear here once it has been checked.</small></div>
+                    </>
+                  ) : r.status === 'submitted' ? (
                     <>
                       <div style={{ fontSize: 24, fontWeight: 800 }}>{r.score}/{r.total}</div>
                       <span className={`pill ${percent(r) >= 50 ? 'active' : 'overdue'}`}>{percent(r)}%</span>
                       <div><small className="subtle">Submitted {fmtDate(r.submittedAt.slice(0, 10))}</small></div>
+                      <button className="btn soft" style={{ marginTop: 8 }} onClick={() => openModal(<ResultReview assignId={r.id} readOnly />, true)}>View result</button>
                     </>
                   ) : (
                     <>
@@ -134,7 +140,7 @@ function Exam({ r, a, onDone }: { r: AssessmentAssign; a: Assessment; onDone: ()
       localStorage.removeItem(draftKey(r.id));
     } catch {}
     await refresh();
-    toast('Assessment submitted');
+    toast('Assessment submitted. Your result is pending and will appear once it has been checked');
     onDone();
   }, [r.id, refresh, toast, onDone]);
 

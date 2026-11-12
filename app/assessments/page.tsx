@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { usePortal } from '@/lib/store';
 import { courseById, examTakerById, learners } from '@/lib/selectors';
 import { Avatar, Empty, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
-import { AssessmentForm, FeedbackForm, ResultReview, exportAnswerSheet, readAnswerSheet, durationLabel, maxMarks, percent } from '@/components/assessments';
+import { AssessmentForm, FeedbackForm, ResultReview, isGraded, exportAnswerSheet, readAnswerSheet, durationLabel, maxMarks, percent } from '@/components/assessments';
 import { fmtDate, today, uid } from '@/lib/util';
 
 type Tab = 'list' | 'assign' | 'report';
@@ -219,7 +219,7 @@ function ReportTab() {
                   <td>{courseById(S, a!.courseId)?.name}</td>
                   <td>{a!.title}<br /><small className="subtle">Due {fmtDate(r.due)}</small></td>
                   <td><Pill kind={STATUS[r.status].kind}>{STATUS[r.status].label}</Pill></td>
-                  <td>{r.status === 'submitted' ? <><b>{r.score}/{r.total}</b> <span className={`pill ${percent(r) >= 50 ? 'active' : 'overdue'}`}>{percent(r)}%</span></> : <span className="subtle">Max {maxMarks(a!)}</span>}</td>
+                  <td>{r.status === 'submitted' ? (isGraded(r) ? <><b>{r.score}/{r.total}</b> <span className={`pill ${percent(r) >= 50 ? 'active' : 'overdue'}`}>{percent(r)}%</span></> : <><b>{r.score}/{r.total}</b> <span className="pill neutral" title="Export the answer sheet, check it, and import it back to release the result to the trainee">Pending check</span></>) : <span className="subtle">Max {maxMarks(a!)}</span>}</td>
                   <td>{r.submittedAt ? fmtDate(r.submittedAt.slice(0, 10)) : '—'}</td>
                   <td>
                     <div className="actions" style={{ justifyContent: 'flex-end' }}>
