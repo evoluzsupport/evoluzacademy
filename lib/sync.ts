@@ -308,10 +308,31 @@ async function fetchAll(t: Table): Promise<Row[]> {
 }
 
 export async function loadRemote(): Promise<State> {
-  // the subtopic table is optional: a database without it still loads
+  // The subtopic table and a few columns are optional. Find out now what this database has, so a save never sends data it cannot store
+  // (a save that fails halfway cannot be repeated: the parts that went through would be sent twice).
+  const probes = Promise.all([
+    supabase.from('assessment_assignments').select('feedback').limit(1),
+    supabase.from('sessions').select('duration_min,notes').limit(1),
+  ]);
   const [profiles, courses, topics, assignments, sessions, sTrainees, sTopics, progress, asms, aqs, akeys, aassigns, pts] = await Promise.all(
-    TABLES.map((t) => (t.name === 'progress_points' ? fetchAll(t).catch(() => [] as Row[]) : fetchAll(t)))
+    TABLES.map((t) =>
+      t.name === 'progress_points'
+        ? fetchAll(t).then(
+            (r) => {
+              pointsTable.ok = true;
+              return r;
+            },
+            () => {
+              pointsTable.ok = false;
+              return [] as Row[];
+            }
+          )
+        : fetchAll(t)
+    )
   );
+  const [fb, se] = await probes;
+  feedbackColumn.ok = !fb.error;
+  sessionExtras.ok = !se.error;
   const s = emptyState();
 
   for (const p of profiles) {

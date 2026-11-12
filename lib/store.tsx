@@ -308,39 +308,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       queue.current = queue.current
         .then(() => pushDiff(prev, next))
         .catch(async (e) => {
-          // the feedback column has not been added to the database yet: save everything else, tell the user about the feedback
-          if (isFeedbackColumnError(e)) {
-            feedbackColumn.ok = false;
-            try {
-              await pushDiff(prev, next);
-              toast('Saved, but the feedback text could not be stored: add the feedback column to the database (supabase/assessments-drafts.sql)');
-            } catch (e2) {
-              toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
-            }
-            await reload();
-            return;
-          }
-          // duration and notes columns have not been added to sessions yet: save the session, tell the user those two were not stored
-          if (isSessionExtrasError(e)) {
-            sessionExtras.ok = false;
-            try {
-              await pushDiff(prev, next);
-              toast('Saved, but the duration and notes could not be stored: add the columns to the database (supabase/progress-points.sql)');
-            } catch (e2) {
-              toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
-            }
-            await reload();
-            return;
-          }
-          // the progress_points table has not been added yet: save the topics, tell the user the subtopics were not stored
-          if (isPointsTableError(e)) {
-            pointsTable.ok = false;
-            try {
-              await pushDiff(prev, next);
-              toast('Saved, but the subtopic records could not be stored: add the progress_points table to the database (supabase/progress-points.sql)');
-            } catch (e2) {
-              toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
-            }
+          // an optional column or table is missing. Never repeat the save: the parts that already went through would be sent twice.
+          if (isFeedbackColumnError(e) || isSessionExtrasError(e) || isPointsTableError(e)) {
+            if (isFeedbackColumnError(e)) feedbackColumn.ok = false;
+            if (isSessionExtrasError(e)) sessionExtras.ok = false;
+            if (isPointsTableError(e)) pointsTable.ok = false;
+            toast('Part of this could not be stored because the database is missing something. Run the SQL files in the supabase folder, then try again.');
             await reload();
             return;
           }
@@ -456,7 +429,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       update((s) => {
         applySession(s, d);
       });
-      return msg;
+      const skipped = [
+        !pointsTable.ok && d.points?.length ? 'subtopics' : '',
+        !sessionExtras.ok && (d.durationMin || d.notes?.trim()) ? 'duration and notes' : '',
+      ].filter(Boolean);
+      return skipped.length ? `${msg} · ${skipped.join(' and ')} not stored: run supabase/progress-points.sql` : msg;
     };
 
     const undoSession: Ctx['undoSession'] = (id) => {
