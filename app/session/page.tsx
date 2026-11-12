@@ -6,7 +6,7 @@ import { isAssigned, orderedTopics, scopeTrainees, statCourse, topicKey, visible
 import { firstTrainer, primaryOf } from '@/lib/seed';
 import { fmtDate, today, validPastOrToday } from '@/lib/util';
 import { Avatar, Guard, PageHead, Pill, SectionTitle } from '@/components/ui';
-import { TopicDetails } from '@/components/topic';
+import { TopicDetails, coverPoints } from '@/components/topic';
 
 export default function SessionPage() {
   const { S, me, saveSession, toast } = usePortal();
@@ -20,7 +20,8 @@ export default function SessionPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [attendeeQ, setAttendeeQ] = useState('');
   const [topicQ, setTopicQ] = useState('');
-  const [points, setPoints] = useState<Set<string>>(new Set());
+  // subtopics ticked in this session, `${topicId}:${pointIndex}` -> trainer who delivered it ('' = the session trainer)
+  const [points, setPoints] = useState<Record<string, string>>({});
   const picker = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function SessionPage() {
     setAttendeeQ('');
     setTopicQ('');
     setTopicIds([]);
-    setPoints(new Set());
+    setPoints({});
     setUpdateExisting(false);
     setTraineeIds([]);
   };
@@ -93,6 +94,18 @@ export default function SessionPage() {
   // topics every selected attendee has already done on this course (logged by any trainer or admin) show ticked and locked
   const doneBy = (tid: string, topicId: string) => S.progress[topicKey(tid, c.id, topicId)];
   const lockedTopic = (topicId: string) => !updateExisting && selected.size > 0 && [...selected].every((tid) => doneBy(tid, topicId)?.done);
+  const pointRec = (tid: string, topicId: string, i: number) => S.points[`${topicKey(tid, c.id, topicId)}|${i}`];
+  // a subtopic is locked when every selected attendee already has it (or has the whole topic)
+  const lockedPoint = (topicId: string, i: number) => !updateExisting && selected.size > 0 && [...selected].every((tid) => !!doneBy(tid, topicId)?.done || !!pointRec(tid, topicId, i));
+  const sessionTrainer = trainer || firstTrainer(c);
+  /** subtopics ticked now that still need saving: not on a topic being marked covered and not already recorded */
+  const newPoints = () =>
+    Object.entries(points).flatMap(([k, tr]) => {
+      const [topicId, idx] = k.split(':');
+      const i = Number(idx);
+      if (topicIds.includes(topicId) || lockedTopic(topicId) || lockedPoint(topicId, i)) return [];
+      return [{ topicId, index: i, trainer: tr || sessionTrainer }];
+    });
   const todayLog = (tid: string) => S.sessions.filter((x) => x.date === today() && x.courseId === c.id && x.traineeIds.includes(tid));
   const names = eligible.filter((t) => selected.has(t.id)).map((t) => t.name);
   const aq = attendeeQ.trim().toLowerCase();
@@ -110,14 +123,20 @@ export default function SessionPage() {
   const save = () => {
     const attendees = traineeIds;
     const toSave = topicIds.filter((id) => !lockedTopic(id));
+    const pointList = newPoints();
     if (!attendees.length) return toast('Choose at least one attendee');
-    if (!toSave.length) {
-      if (topicIds.length) return toast('Those topics are already covered for the selected attendees. Pick a topic that is not yet covered, or tick “Update already completed topics”');
-      if (points.size) return toast('Click “Mark Topic Covered” on the topic. Ticking its points alone does not select the topic');
-      return toast('Click “Mark Topic Covered” on at least one topic');
+    if (!toSave.length && !pointList.length) {
+      if (topicIds.length || Object.keys(points).length) return toast('Those topics and subtopics are already covered for the selected attendees. Pick something not yet covered, or tick “Update already completed topics”');
+      return toast('Tick at least one subtopic, or press “Mark Topic Covered” on a topic');
+    }
+    // a topic marked covered is credited to every trainer who delivered one of its ticked subtopics
+    const topicTrainer: Record<string, string> = {};
+    for (const id of toSave) {
+      const names = [...new Set(Object.entries(points).filter(([k]) => k.startsWith(`${id}:`)).map(([, tr]) => tr || sessionTrainer))];
+      if (names.length) topicTrainer[id] = names.join(' / ');
     }
     if (!validPastOrToday(date)) return toast('Choose today or an earlier session date');
-    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds: toSave, updateExisting, by: me ? { name: me.name, admin: me.kind === 'admin' } : undefined });
+    const msg = saveSession({ courseId: c.id, trainer: trainer || firstTrainer(c), date, traineeIds: attendees, topicIds: toSave, topicTrainer, points: pointList, updateExisting, by: me ? { name: me.name, admin: me.kind === 'admin' } : undefined });
     if (msg) {
       toast(msg);
       router.push('/sessions');
@@ -128,7 +147,7 @@ export default function SessionPage() {
     <Guard kinds={['admin', 'trainer']}>
       <PageHead
         title="Log a training session"
-        desc="Choose the attendees, check the topics covered, then save once for the group."
+        desc="Choose the attendees, tick the subtopics covered (each can have its own trainer) or mark a whole topic covered, then save once for the group."
         actions={<button className="btn primary" onClick={save}>✓ Save session</button>}
       />
       <div className="grid" style={{ gap: 15 }}>
@@ -204,7 +223,7 @@ export default function SessionPage() {
             sub="Every checked topic will be marked for all selected trainees above."
             right={
               <span style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" onClick={() => setTopicIds([])}>Clear</button>
+                <button className="btn" onClick={() => { setTopicIds([]); setPoints({}); }}>Clear</button>
                 <button className="btn soft" onClick={() => setTopicIds(c.topics.map((t) => t.id))}>Select all topics</button>
               </span>
             }
@@ -232,12 +251,34 @@ export default function SessionPage() {
                     cover={x.cover}
                     activity={x.activity}
                     disabled={covered}
-                    checked={new Set([...points].filter((k) => k.startsWith(`${x.id}:`)).map((k) => Number(k.split(':')[1])))}
+                    locked={new Set(coverPoints(x.cover).map((_, i) => i).filter((i) => lockedPoint(x.id, i)))}
+                    checked={new Set(Object.keys(points).filter((k) => k.startsWith(`${x.id}:`)).map((k) => Number(k.split(':')[1])))}
                     onCheck={(i, on) => setPoints((p) => {
-                      const n = new Set(p);
-                      on ? n.add(`${x.id}:${i}`) : n.delete(`${x.id}:${i}`);
+                      const n = { ...p };
+                      if (on) n[`${x.id}:${i}`] = n[`${x.id}:${i}`] ?? '';
+                      else delete n[`${x.id}:${i}`];
                       return n;
                     })}
+                    extra={(i) => {
+                      if (covered) return null;
+                      const key = `${x.id}:${i}`;
+                      if (lockedPoint(x.id, i)) {
+                        const rec = [...selected].map((tid) => pointRec(tid, x.id, i) ?? doneBy(tid, x.id)).find(Boolean);
+                        return rec?.trainer ? <small className="covered-by">by {rec.trainer}</small> : null;
+                      }
+                      if (points[key] === undefined) return null;
+                      return (
+                        <select
+                          className="select"
+                          style={{ padding: '3px 6px', fontSize: 10, marginLeft: 24, marginTop: 4, maxWidth: 220 }}
+                          aria-label="Trainer who delivered this subtopic"
+                          value={points[key] || sessionTrainer}
+                          onChange={(e) => setPoints((p) => ({ ...p, [key]: e.target.value }))}
+                        >
+                          {(deliverers.includes(points[key] || sessionTrainer) ? deliverers : [points[key] || sessionTrainer, ...deliverers]).map((n) => <option key={n}>{n}</option>)}
+                        </select>
+                      );
+                    }}
                   />
                 </span>
                 <div className="covered-wrap">
@@ -259,6 +300,7 @@ export default function SessionPage() {
           <div className="session-summary">
             <div><b>{selected.size}</b><span>attendees</span></div>
             <div><b>{chosen.size}</b><span>topics</span></div>
+            <div><b>{newPoints().length}</b><span>subtopics</span></div>
             <div><b>{marks}</b><span>new marks</span></div>
             <div><b>{already}</b><span>already done</span></div>
           </div>

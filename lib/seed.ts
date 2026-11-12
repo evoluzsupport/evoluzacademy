@@ -118,6 +118,7 @@ export function makeSeed(): State {
     courses,
     assignments,
     progress,
+    points: {},
     sessions: [],
     assessments: [],
     assessmentAssigns: [],

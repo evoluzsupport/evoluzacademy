@@ -77,6 +77,12 @@ export interface ProgressRec {
   trainer: string;
   sessionId?: string;
 }
+/** A subtopic ("What we cover" point) a trainer has delivered to a learner, before or without the whole topic being marked covered. */
+export interface PointRec {
+  date: string;
+  trainer: string;
+  sessionId?: string;
+}
 export interface Session {
   id: string;
   courseId: string;
@@ -136,6 +142,8 @@ export interface State {
   assignments: Assignment[];
   /** key: `${traineeId}|${courseId}|${topicId}` */
   progress: Record<string, ProgressRec>;
+  /** key: `${traineeId}|${courseId}|${topicId}|${pointIndex}` */
+  points: Record<string, PointRec>;
   sessions: Session[];
   assessments: Assessment[];
   assessmentAssigns: AssessmentAssign[];
