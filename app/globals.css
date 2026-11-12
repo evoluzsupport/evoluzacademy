@@ -63,6 +63,13 @@ html[data-theme=dark] img,html[data-theme=dark] svg,html[data-theme=dark] .avata
 .tdet ul.tdet-checks li:before{display:none}
 .tdet-checks label{display:flex;gap:8px;align-items:flex-start;cursor:pointer;text-transform:none!important}
 .tdet-checks input{margin-top:3px;accent-color:#3158b6}
+.tsl{margin-top:9px;border:1px solid #dde4f0;border-radius:8px;background:#fafbfe;font-size:12px}
+.tsl summary{cursor:pointer;padding:6px 10px;font-weight:700;color:#3158b6;text-transform:none!important}
+.tsl ul{list-style:none;margin:0;padding:4px 10px 8px;display:grid;gap:8px}
+.tsl li{padding-top:6px;border-top:1px dashed #e3e8f2;color:#4a5870;line-height:1.5}
+.tsl li:first-child{border-top:0;padding-top:0}
+.tsl-pts{margin-top:2px;color:#3158b6}
+.tsl-notes{margin-top:2px;white-space:pre-wrap;color:#5a6a85}
 .topic-choice.is-covered{opacity:.6;background:#f4f6fa}
 .topic-choice .covered-wrap{margin-left:auto;align-self:flex-start;display:flex;align-items:center;gap:10px;flex:none}
 .topic-choice .covered-by{font-size:12px;font-weight:600;color:#168767;white-space:nowrap;text-transform:none!important}

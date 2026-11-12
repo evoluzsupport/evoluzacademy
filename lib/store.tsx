@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { Kind, Me, State, Trainee, Trainer } from './types';
 import { removedEmail } from './emails';
 import { sendAccessRequestMail, sendAll } from './mailer';
-import { emptyState, feedbackColumn, isFeedbackColumnError, isPointsTableError, loadRemote, myProfile, pointsTable, pushDiff } from './sync';
+import { emptyState, feedbackColumn, isFeedbackColumnError, isPointsTableError, isSessionExtrasError, loadRemote, myProfile, pointsTable, pushDiff, sessionExtras } from './sync';
 import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
@@ -27,6 +27,10 @@ export interface SessionDraft {
   topicTrainer?: Record<string, string>;
   /** subtopics ("What we cover" points) delivered in this session, each with its own trainer */
   points?: { topicId: string; index: number; trainer: string }[];
+  /** how long the session ran, in minutes */
+  durationMin?: number;
+  /** what was taught */
+  notes?: string;
   updateExisting: boolean;
   /** who is saving it: other people's completed topics are never overwritten unless they are an admin */
   by?: { name: string; admin: boolean };
@@ -102,24 +106,23 @@ function applySession(s: State, d: SessionDraft): string | null {
   const id = uid('s');
   let newMarks = 0;
   let kept = 0;
+  // a topic can be logged in any number of sessions: the first time it is marked covered it completes for the learner,
+  // later sessions are still recorded and never change what was recorded before
   for (const topicId of d.topicIds)
     for (const tid of attendees) {
       const key = topicKey(tid, c.id, topicId);
-      const cur = s.progress[key];
-      if (cur?.done && (!d.updateExisting || (d.by && !d.by.admin && !nameMatches(cur.trainer, d.by.name)))) {
+      if (s.progress[key]?.done) {
         kept++;
         continue;
       }
       s.progress[key] = { done: true, date: d.date, trainer: d.topicTrainer?.[topicId] || d.trainer, sessionId: id };
       newMarks++;
     }
-  // subtopics: recorded per learner unless the whole topic is already covered or that subtopic was already logged
+  // subtopics: one record per learner, subtopic and session, so the same subtopic can be delivered again by another trainer
   let pointMarks = 0;
   for (const p of points)
     for (const tid of attendees) {
-      const key = `${topicKey(tid, c.id, p.topicId)}|${p.index}`;
-      if (s.progress[topicKey(tid, c.id, p.topicId)]?.done || (s.points[key] && !d.updateExisting)) continue;
-      s.points[key] = { date: d.date, trainer: p.trainer, sessionId: id };
+      s.points[`${topicKey(tid, c.id, p.topicId)}|${p.index}|${id}`] = { date: d.date, trainer: p.trainer, sessionId: id };
       pointMarks++;
     }
   s.sessions.push({
@@ -132,8 +135,10 @@ function applySession(s: State, d: SessionDraft): string | null {
     topicIds: [...new Set([...d.topicIds, ...points.map((p) => p.topicId)])],
     newMarks,
     existingPreserved: kept,
+    ...(d.durationMin ? { durationMin: d.durationMin } : {}),
+    ...(d.notes?.trim() ? { notes: d.notes.trim() } : {}),
   });
-  return `Session saved · ${newMarks} topic marks${pointMarks ? ` · ${pointMarks} subtopic marks` : ''}${kept ? ` · ${kept} existing marks preserved` : ''}`;
+  return `Session saved · ${newMarks} topic${newMarks === 1 ? '' : 's'} completed${pointMarks ? ` · ${pointMarks} subtopic marks` : ''}${kept ? ` · ${kept} already completed, session logged` : ''}`;
 }
 
 function findMe(S: State, kind: Kind, id: string): Me | null {
@@ -309,6 +314,18 @@ export function PortalProvider({ children }: { children: ReactNode }) {
             try {
               await pushDiff(prev, next);
               toast('Saved, but the feedback text could not be stored: add the feedback column to the database (supabase/assessments-drafts.sql)');
+            } catch (e2) {
+              toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
+            }
+            await reload();
+            return;
+          }
+          // duration and notes columns have not been added to sessions yet: save the session, tell the user those two were not stored
+          if (isSessionExtrasError(e)) {
+            sessionExtras.ok = false;
+            try {
+              await pushDiff(prev, next);
+              toast('Saved, but the duration and notes could not be stored: add the columns to the database (supabase/progress-points.sql)');
             } catch (e2) {
               toast(`Could not save: ${e2 instanceof Error ? e2.message : 'unknown error'}`);
             }

@@ -25,6 +25,9 @@ export const emptyState = (): State => ({
 export const feedbackColumn = { ok: true };
 /** Set to false once the database reports there is no progress_points table, so sessions still save without subtopic records. */
 export const pointsTable = { ok: true };
+/** Set to false once the database reports there are no duration_min / notes columns on sessions. */
+export const sessionExtras = { ok: true };
+export const isSessionExtrasError = (e: unknown) => e instanceof Error && /'(duration_min|notes)' column/.test(e.message);
 export const isPointsTableError = (e: unknown) => e instanceof Error && /progress_points/.test(e.message);
 export const isFeedbackColumnError = (e: unknown) => e instanceof Error && /'feedback' column/.test(e.message);
 
@@ -125,8 +128,10 @@ const TABLES: Table[] = [
     name: 'sessions',
     pk: ['id'],
     order: ['created_at', 'id'],
-    rows: (s) =>
-      s.sessions.map((x) => ({
+    // duration and notes are only written once a session has them, so saves keep working on a database without those columns
+    rows: (s) => {
+      const extras = sessionExtras.ok && s.sessions.some((x) => x.durationMin || x.notes);
+      return s.sessions.map((x) => ({
         id: x.id,
         course_id: x.courseId,
         course_name: x.courseName,
@@ -134,7 +139,9 @@ const TABLES: Table[] = [
         trainer: x.trainer,
         new_marks: x.newMarks,
         existing_preserved: x.existingPreserved,
-      })),
+        ...(extras ? { duration_min: x.durationMin ?? null, notes: x.notes ?? '' } : {}),
+      }));
+    },
   },
   {
     name: 'session_trainees',
@@ -213,13 +220,13 @@ const TABLES: Table[] = [
   },
   {
     name: 'progress_points',
-    pk: ['trainee_id', 'course_id', 'topic_id', 'point'],
-    order: ['trainee_id', 'course_id', 'topic_id', 'point'],
+    pk: ['trainee_id', 'course_id', 'topic_id', 'point', 'session_id'],
+    order: ['trainee_id', 'course_id', 'topic_id', 'point', 'session_id'],
     rows: (s) =>
       pointsTable.ok
         ? Object.entries(s.points ?? {}).map(([k, r]) => {
-            const [trainee_id, course_id, topic_id, point] = k.split('|');
-            return { trainee_id, course_id, topic_id, point: Number(point), done_on: r.date, trainer: r.trainer, session_id: r.sessionId ?? null };
+            const [trainee_id, course_id, topic_id, point, session_id] = k.split('|');
+            return { trainee_id, course_id, topic_id, point: Number(point), session_id, done_on: r.date, trainer: r.trainer };
           })
         : [],
   },
@@ -376,11 +383,13 @@ export async function loadRemote(): Promise<State> {
       topicIds: tps.get(str(x.id)) ?? [],
       newMarks: Number(x.new_marks) || 0,
       existingPreserved: Number(x.existing_preserved) || 0,
+      ...(x.duration_min != null ? { durationMin: Number(x.duration_min) } : {}),
+      ...(x.notes ? { notes: str(x.notes) } : {}),
     })
   );
 
   for (const r of pts) {
-    s.points[`${r.trainee_id}|${r.course_id}|${r.topic_id}|${r.point}`] = { date: str(r.done_on), trainer: str(r.trainer), ...(r.session_id ? { sessionId: str(r.session_id) } : {}) };
+    s.points[`${r.trainee_id}|${r.course_id}|${r.topic_id}|${r.point}|${r.session_id}`] = { date: str(r.done_on), trainer: str(r.trainer), sessionId: str(r.session_id) };
   }
   for (const r of progress) {
     const rec: ProgressRec = { done: true, date: str(r.done_on), trainer: str(r.trainer) };
