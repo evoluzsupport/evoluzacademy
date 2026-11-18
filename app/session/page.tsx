@@ -237,7 +237,6 @@ export default function SessionPage() {
             {!shownTopics.length && <div className="empty">No topics match “{topicQ}”.</div>}
             {shownTopics.map((x) => {
               const doneN = [...selected].filter((tid) => doneBy(tid, x.id)?.done).length;
-              const doneAll = selected.size > 0 && doneN === selected.size;
               const last = [...selected].map((tid) => doneBy(tid, x.id)).find((r) => r?.done);
               const covered = chosen.has(x.id);
               const ticked = newPoints().filter((p) => p.topicId === x.id);
@@ -289,7 +288,7 @@ export default function SessionPage() {
                 </span>
                 <div className="covered-wrap">
                   <button type="button" className="btn soft covered-btn" disabled={covered} onClick={() => setTopicIds((l) => toggle(l, x.id, true))}>
-                    {covered ? (doneAll ? '✓ Session Logged' : '✓ Topic Covered') : doneAll ? 'Log Another Session' : 'Mark Topic Covered'}
+                    {covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
                   </button>
                   {covered && (
                     <span className="covered-by">by {[...new Set(ticked.map((p) => p.trainer))].join(' / ') || sessionTrainer}</span>
