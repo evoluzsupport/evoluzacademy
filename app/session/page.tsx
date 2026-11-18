@@ -228,7 +228,7 @@ export default function SessionPage() {
             right={
               <span style={{ display: 'flex', gap: 8 }}>
                 <button className="btn" onClick={() => { setTopicIds([]); setPoints({}); }}>Clear</button>
-                <button className="btn soft" onClick={() => setTopicIds(c.topics.map((t) => t.id))}>Select all topics</button>
+                <button className="btn soft" onClick={() => setTopicIds(c.topics.filter((t) => !(selected.size > 0 && [...selected].every((tid) => doneBy(tid, t.id)?.done))).map((t) => t.id))}>Select all topics</button>
               </span>
             }
           />
@@ -238,7 +238,9 @@ export default function SessionPage() {
             {shownTopics.map((x) => {
               const doneN = [...selected].filter((tid) => doneBy(tid, x.id)?.done).length;
               const last = [...selected].map((tid) => doneBy(tid, x.id)).find((r) => r?.done);
-              const covered = chosen.has(x.id);
+              const doneAll = selected.size > 0 && doneN === selected.size;
+              // locked once marked covered here, or once every chosen attendee has already completed it
+              const covered = chosen.has(x.id) || doneAll;
               const ticked = newPoints().filter((p) => p.topicId === x.id);
               const sessions = S.sessions.filter((q) => q.courseId === c.id && q.topicIds.includes(x.id) && (!attendee || q.traineeIds.includes(attendee))).length;
               return (
@@ -291,7 +293,7 @@ export default function SessionPage() {
                     {covered ? '✓ Topic Covered' : 'Mark Topic Covered'}
                   </button>
                   {covered && (
-                    <span className="covered-by">by {[...new Set(ticked.map((p) => p.trainer))].join(' / ') || sessionTrainer}</span>
+                    <span className="covered-by">by {chosen.has(x.id) ? ([...new Set(ticked.map((p) => p.trainer))].join(' / ') || sessionTrainer) : (last?.trainer ?? sessionTrainer)}</span>
                   )}
                 </div>
               </div>
