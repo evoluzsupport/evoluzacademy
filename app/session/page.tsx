@@ -105,6 +105,7 @@ export default function SessionPage() {
       return { topicId, index: Number(idx), trainer: tr || sessionTrainer };
     });
   const todayLog = (tid: string) => S.sessions.filter((x) => x.date === today() && x.courseId === c.id && x.traineeIds.includes(tid));
+  const attendee = traineeIds[0];
   const names = eligible.filter((t) => selected.has(t.id)).map((t) => t.name);
   const aq = attendeeQ.trim().toLowerCase();
   const shownPeople = aq ? eligible.filter((t) => `${t.name} ${t.label}`.toLowerCase().includes(aq)) : eligible;
@@ -121,7 +122,7 @@ export default function SessionPage() {
   const save = () => {
     const attendees = traineeIds;
     const pointList = newPoints();
-    if (!attendees.length) return toast('Choose at least one attendee');
+    if (!attendees.length) return toast('Choose who attended');
     if (!topicIds.length && !pointList.length) return toast('Tick at least one subtopic, or press “Mark Topic Covered” on a topic');
     const mins = duration.trim() === '' ? undefined : Number(duration);
     if (mins !== undefined && (!Number.isInteger(mins) || mins < 1 || mins > 1440)) return toast('Duration must be a whole number of minutes, between 1 and 1440');
@@ -178,21 +179,20 @@ export default function SessionPage() {
         </section>
 
         <section className="card detail-panel">
-          <SectionTitle title="2 · Who is attending?" sub="Tick everyone who attended. Anyone in the directory can be added. Anyone not yet on this course is assigned when you save." />
+          <SectionTitle title="2 · Who is attending?" sub="Choose the person who attended. Anyone in the directory can be chosen. If they are not yet on this course they are assigned when you save." />
           <div className="attendee-picker" ref={picker}>
             <button type="button" className="attendee-trigger" aria-expanded={menuOpen} aria-controls="attendeeMenu" onClick={() => setMenuOpen((o) => !o)}>
               <span className="attendee-trigger-copy">
-                <b>{selected.size} of {eligible.length} selected</b>
-                <small>{names.join(', ') || (eligible.length ? 'Choose attendees' : 'No users yet')}</small>
+                <b>{names[0] ?? 'Choose attendee'}</b>
+                <small>{names[0] ? 'Attendee' : eligible.length ? 'Select one person' : 'No users yet'}</small>
               </span>
               <span className="attendee-chevron">⌄</span>
             </button>
             {menuOpen && (
               <div className="attendee-menu" id="attendeeMenu">
                 <div className="attendee-menu-actions">
-                  <b>{selected.size} of {eligible.length} selected</b>
+                  <b>{selected.size ? '1 selected' : 'None selected'}</b>
                   <span>
-                    <button type="button" className="btn soft" onClick={() => setTraineeIds(eligible.map((t) => t.id))}>Select all</button>
                     <button type="button" className="btn" onClick={() => setTraineeIds([])}>Clear</button>
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export default function SessionPage() {
                 <div className="attendee-option-list">
                   {shownPeople.map((t) => (
                     <label className="attendee-option" key={t.id}>
-                      <input type="checkbox" checked={selected.has(t.id)} onChange={(e) => setTraineeIds((l) => toggle(l, t.id, e.target.checked))} />
+                      <input type="radio" name="attendee" checked={selected.has(t.id)} onChange={() => { setTraineeIds([t.id]); setMenuOpen(false); }} />
                       <span className="attendee-identity">
                         <Avatar name={t.name} tone={t.tone} />
                         <span><b>{t.name}</b><small>{t.label}</small></span>
@@ -241,7 +241,7 @@ export default function SessionPage() {
               const last = [...selected].map((tid) => doneBy(tid, x.id)).find((r) => r?.done);
               const covered = chosen.has(x.id);
               const ticked = newPoints().filter((p) => p.topicId === x.id);
-              const sessions = S.sessions.filter((q) => q.courseId === c.id && q.topicIds.includes(x.id)).length;
+              const sessions = S.sessions.filter((q) => q.courseId === c.id && q.topicIds.includes(x.id) && (!attendee || q.traineeIds.includes(attendee))).length;
               return (
               <div className={`choice topic-choice${covered ? ' is-covered' : ''}`} key={x.id} aria-disabled={covered}>
                 <span>
@@ -285,7 +285,7 @@ export default function SessionPage() {
                       );
                     }}
                   />
-                  <TopicSessionLog courseId={c.id} topicId={x.id} cover={x.cover} />
+                  <TopicSessionLog courseId={c.id} topicId={x.id} cover={x.cover} traineeId={attendee} />
                 </span>
                 <div className="covered-wrap">
                   <button type="button" className="btn soft covered-btn" disabled={covered} onClick={() => setTopicIds((l) => toggle(l, x.id, true))}>
