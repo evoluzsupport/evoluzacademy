@@ -12,7 +12,7 @@ import type { Grouper } from '@/components/views';
 import type { Trainee } from '@/lib/types';
 
 export default function TraineesPage() {
-  const { S, me, openModal, confirm, removeTrainees } = usePortal();
+  const { S, me, openModal, confirm, removeTrainees, setRole } = usePortal();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -124,6 +124,7 @@ export default function TraineesPage() {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <Link className="btn soft" href={`/trainees/${t.id}`}>View →</Link>
                   {isAdmin && S.trainees.some((x) => x.id === t.id) && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
+{isAdmin && S.trainees.some((x) => x.id === t.id) && t.id !== me?.id && <button className="btn" title="Change this person's access role to Trainer" onClick={() => confirm(`Make ${t.name} a trainer? They will move from Trainees to Trainers.`, () => { setRole(t.id, 'trainer'); }, 'Make trainer')}>Make trainer</button>}
                 </div>
               </div>
             </div>
@@ -157,6 +158,7 @@ export default function TraineesPage() {
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <Link className="btn soft" href={`/trainees/${t.id}`}>View →</Link>
                       {isAdmin && S.trainees.some((x) => x.id === t.id) && <button className="btn" onClick={() => openModal(<TraineeForm id={t.id} />)}>Edit</button>}
+{isAdmin && S.trainees.some((x) => x.id === t.id) && t.id !== me?.id && <button className="btn" title="Change this person's access role to Trainer" onClick={() => confirm(`Make ${t.name} a trainer? They will move from Trainees to Trainers.`, () => { setRole(t.id, 'trainer'); }, 'Make trainer')}>Make trainer</button>}
                     </div>
                   </td>
                 </tr>
