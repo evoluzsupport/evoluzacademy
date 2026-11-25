@@ -7,6 +7,7 @@ import { ImportDialog } from '@/components/csvdialog';
 import { downloadCSV } from '@/lib/csv';
 import { ViewBody, ViewSwitch, useView } from '@/components/views';
 import type { Grouper } from '@/components/views';
+import type { Kind } from '@/lib/types';
 
 function UserForm({ id }: { id?: string }) {
   const { S, saveUser, closeModal, toast } = usePortal();
@@ -89,6 +90,31 @@ export default function UsersPage() {
     if (setRole(adminPick, 'admin')) setAdminPick('');
   };
 
+  // Change anyone's role. Moves to or from admin are confirmed first.
+  const changeRole = (p: { id: string; name: string; listed: string }, role: Kind) => {
+    const label = role === 'admin' ? 'an admin' : `a ${role}`;
+    if (role === 'admin' || p.listed === 'Admin') {
+      confirm(`Make ${p.name} ${label}? This changes what they can see and manage.`, () => { setRole(p.id, role); }, 'Change role');
+    } else {
+      setRole(p.id, role);
+    }
+  };
+  const roleSelect = (p: { id: string; name: string; listed: string }) => (
+    <select
+      className="input"
+      aria-label={`Role for ${p.name}`}
+      value={p.listed === 'Not enrolled' ? '' : p.listed.toLowerCase()}
+      disabled={p.id === me?.id}
+      title={p.id === me?.id ? 'You cannot change your own access' : 'Change role'}
+      onChange={(e) => changeRole(p, e.target.value as Kind)}
+    >
+      {p.listed === 'Not enrolled' && <option value="" disabled>Not enrolled</option>}
+      <option value="admin">Admin</option>
+      <option value="trainer">Trainer</option>
+      <option value="trainee">Trainee</option>
+    </select>
+  );
+
   const del = (id: string, name: string) =>
     confirm(`Remove ${name}? They lose access, and their assignments and progress are deleted.`, () => removeUser(id), 'Remove user');
 
@@ -96,7 +122,7 @@ export default function UsersPage() {
     <Guard kinds={['admin']}>
       <PageHead
         title="Users"
-        desc="Everyone who can sign in to Evoluz Academy. Add people here first, then add them as a trainee or trainer to give them that access."
+        desc="Everyone who can sign in to Evoluz Academy. Add people here, then use the Role dropdown to make them an admin, trainer or trainee."
         actions={
           <>
             <button className="btn" onClick={() => openModal(<ImportDialog kind="users" />)}>Import CSV</button>
@@ -129,7 +155,7 @@ export default function UsersPage() {
               <div className="vmail">{p.email || 'No email · cannot sign in'}</div>
               <dl className="vmeta">
                 <div><dt>Phone</dt><dd>{p.phone || '—'}</dd></div>
-                <div><dt>Listed as</dt><dd>{p.listed}</dd></div>
+                <div><dt>Role</dt><dd>{roleSelect(p)}</dd></div>
               </dl>
               <div className="vfoot" style={{ justifyContent: 'flex-end' }}>
                 <button className="btn" onClick={() => openModal(<UserForm id={p.id} />)}>Edit</button>
@@ -141,7 +167,7 @@ export default function UsersPage() {
             <div className="table-wrap">
               <table className="table">
                 <thead>
-                  <tr><th>User</th><th>Email</th><th>Phone</th><th>Listed as</th><th></th></tr>
+                  <tr><th>User</th><th>Email</th><th>Phone</th><th>Role</th><th></th></tr>
                 </thead>
                 <tbody>
                   {users.map((p) => (
@@ -155,7 +181,7 @@ export default function UsersPage() {
                       </td>
                       <td>{p.email || <span className="subtle">No email · cannot sign in</span>}</td>
                       <td>{p.phone || '—'}</td>
-                      <td><span className={`pill ${p.listed === 'Not enrolled' ? 'neutral' : p.listed === 'Admin' ? 'progress' : 'active'}`}>{p.listed}</span></td>
+                      <td>{roleSelect(p)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button className="btn" onClick={() => openModal(<UserForm id={p.id} />)}>Edit</button>
