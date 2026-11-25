@@ -73,8 +73,8 @@ export default function AssignedCoursesPage() {
             </div>
           </section>
           <section className="card detail-panel">
-            <SectionTitle title={`${c.name} · ${topics.length} topics`} right={<span className="subtle">View only · your trainer marks completion</span>} />
-            {topics.map((x) => <TopicRow key={`${me.id}-${c.id}-${x.id}`} traineeId={me.id} course={c} topic={x} editable={false} />)}
+            <SectionTitle title={`${c.name} · ${topics.length} topics`} right={<span className="subtle">{done} complete · {topics.length - done} remaining</span>} />
+            {topics.map((x) => <TopicRow key={`${me.id}-${c.id}-${x.id}`} traineeId={me.id} course={c} topic={x} editable />)}
           </section>
         </>
       )}
