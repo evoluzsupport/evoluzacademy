@@ -9,6 +9,7 @@ import { applyImport } from './importers';
 import { parseCSV, type ImportKind } from './csv';
 import { uid, today, validPastOrToday } from './util';
 import { canEditCompletion, isAssigned, nameMatches, topicKey } from './selectors';
+import { applySelfTick, type SelfTick } from './selftick';
 import { renameTrainer } from './seed';
 import { supabase } from './supabase';
 
@@ -67,6 +68,8 @@ export interface Ctx {
   // domain actions
   toggleTopic: (tid: string, cid: string, topicId: string, trainer: string, date: string) => void;
   patchCompletion: (tid: string, cid: string, topicId: string, patch: { date?: string; trainer?: string }) => void;
+  /** tick or untick a topic or subtopic on the signed-in person's own course */
+  selfTick: (d: Omit<SelfTick, 'me'>) => void;
   assign: (traineeId: string, courseId: string, due?: string, trainer?: string, startDate?: string) => boolean;
   unassign: (assignmentId: string) => void;
   saveSession: (d: SessionDraft) => string | null;
@@ -409,6 +412,24 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       });
     };
 
+    const selfTick: Ctx['selfTick'] = (d) => {
+      const who = meRef.current;
+      if (!who) return;
+      if (d.on && !validPastOrToday(d.date)) {
+        toast('Choose today or an earlier date');
+        return;
+      }
+      const tick = { ...d, me: { id: who.id, name: who.name } };
+      const refused = applySelfTick(structuredClone(S0.current), tick);
+      if (refused) {
+        toast(refused);
+        return;
+      }
+      update((s) => {
+        applySelfTick(s, tick);
+      });
+    };
+
     const assign: Ctx['assign'] = (traineeId, courseId, due = '', trainer = '', startDate = '') => {
       if (isAssigned(S0.current, traineeId, courseId)) return false;
       update((s) => {
@@ -651,7 +672,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return { added: fresh.length, skipped };
     };
 
-    return { toggleTopic, patchCompletion, assign, unassign, saveSession, undoSession, removeTrainee, removeTrainees, removeTrainers, removeCourse, removeCourses, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
+    return { toggleTopic, patchCompletion, selfTick, assign, unassign, saveSession, undoSession, removeTrainee, removeTrainees, removeTrainers, removeCourse, removeCourses, removeTopic, importCSV, setRole, saveUser, removeUser, addPeople };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [update, toast]);
 

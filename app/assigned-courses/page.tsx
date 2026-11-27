@@ -39,7 +39,12 @@ export default function AssignedCoursesPage() {
                 const assignedTrainer = real(a.trainer) || real(primaryOf(cc)) || 'No Trainer Assigned';
                 return (
                   <tr key={a.id}>
-                    <td><b>{cc.name}</b></td>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span className={`check ${st.pct >= 100 ? 'checked' : ''}`} role="img" aria-label={st.pct >= 100 ? 'Course completed' : 'Course not completed'}>{st.pct >= 100 ? '✓' : ''}</span>
+                        <b>{cc.name}</b>
+                      </span>
+                    </td>
                     <td><b>{assignedTrainer}</b></td>
                     <td>{primaryOf(cc)}</td>
                     <td>{fmtDate(a.assignedOn)}{a.assignedBy && <small className="subtle" style={{ display: 'block' }}>by {a.assignedBy}</small>}</td>
@@ -74,7 +79,7 @@ export default function AssignedCoursesPage() {
           </section>
           <section className="card detail-panel">
             <SectionTitle title={`${c.name} · ${topics.length} topics`} right={<span className="subtle">{done} complete · {topics.length - done} remaining</span>} />
-            {topics.map((x) => <TopicRow key={`${me.id}-${c.id}-${x.id}`} traineeId={me.id} course={c} topic={x} editable />)}
+            {topics.map((x) => <TopicRow key={`${me.id}-${c.id}-${x.id}`} traineeId={me.id} course={c} topic={x} editable own />)}
           </section>
         </>
       )}

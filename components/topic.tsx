@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { usePortal } from '@/lib/store';
 import { firstTrainer } from '@/lib/seed';
 import { canEditCompletion, nameMatches, topicKey, trainerNames } from '@/lib/selectors';
+import { canUntickOwn } from '@/lib/selftick';
+import { pointsTable } from '@/lib/sync';
 import type { Course, Topic } from '@/lib/types';
 import { fmtDate, today } from '@/lib/util';
 
@@ -126,13 +128,15 @@ export function TopicSessionLog({ courseId, topicId, cover, traineeId }: { cours
 /**
  * One topic with its per-learner completion state; editable for trainers/admins, view only for trainees.
  * The "What we cover" boxes only show what was delivered (and by whom); sessions are logged on the Log a session page.
+ * With `own` (a trainer's My Course page) the person ticks their own topic and its subtopics, and can undo their own ticks.
  */
-export function TopicRow({ traineeId, course, topic, editable: allowed }: { traineeId: string; course: Course; topic: Topic; editable: boolean }) {
-  const { S, me, toggleTopic, patchCompletion } = usePortal();
+export function TopicRow({ traineeId, course, topic, editable: allowed, own = false }: { traineeId: string; course: Course; topic: Topic; editable: boolean; own?: boolean }) {
+  const { S, me, toggleTopic, patchCompletion, selfTick } = usePortal();
   const rec = S.progress[topicKey(traineeId, course.id, topic.id)];
   const done = !!rec?.done;
   // a completed topic can only be changed by the trainer who delivered it (or an admin)
-  const editable = allowed && canEditCompletion(me, rec);
+  // on their own course a person can also undo what they ticked themselves, whoever delivered it
+  const editable = allowed && (canEditCompletion(me, rec) || (own && !!me && !!rec && canUntickOwn(me.name, rec)));
   const locked = allowed && done && !editable;
   // default "delivered by": the signed-in person when they are one of the course's trainers, else its first trainer
   const [draftTrainer, setDraftTrainer] = useState(me && nameMatches(course.primaryTrainer, me.name) ? me.name : firstTrainer(course));
@@ -146,7 +150,12 @@ export function TopicRow({ traineeId, course, topic, editable: allowed }: { trai
     const names = Object.entries(S.points).filter(([k]) => k.startsWith(prefix)).map(([, r]) => r.trainer);
     return [...new Set(names.length ? names : done && rec ? [rec.trainer] : [])];
   };
-  const recorded = new Set(coverPoints(topic.cover).map((_, i) => i).filter((i) => pointTrainers(i).length > 0));
+  const points = coverPoints(topic.cover);
+  // on one's own course a completed topic counts as every subtopic
+  const recorded = new Set(points.map((_, i) => i).filter((i) => (own && done) || pointTrainers(i).length > 0));
+  const tick = (point: number | null, on: boolean) => selfTick({ courseId: course.id, topicId: topic.id, pointCount: points.length, point, on, trainer, date });
+  // subtopic records need their database table; without it only whole topics can be ticked
+  const tickPoints = own && pointsTable.ok && (!done || editable);
   const byWho = (i: number) => {
     const t = pointTrainers(i);
     return t.length ? <small className="covered-by" style={{ marginLeft: 24 }}>by {t.join(', ')}</small> : null;
@@ -162,7 +171,7 @@ export function TopicRow({ traineeId, course, topic, editable: allowed }: { trai
         title={editable ? (done ? 'Mark incomplete' : 'Mark complete') : locked ? `Delivered by ${rec?.trainer}. Only they or an admin can change it` : done ? 'Completed' : 'Not completed yet'}
         disabled={!editable}
         style={editable ? undefined : { cursor: 'default' }}
-        onClick={() => toggleTopic(traineeId, course.id, topic.id, trainer, date)}
+        onClick={() => (own ? tick(null, !done) : toggleTopic(traineeId, course.id, topic.id, trainer, date))}
       >
         {done ? '✓' : ''}
       </button>
@@ -171,15 +180,15 @@ export function TopicRow({ traineeId, course, topic, editable: allowed }: { trai
         <TopicDetails
           cover={topic.cover}
           activity={topic.activity}
-          checked={new Set<number>()}
-          onCheck={() => undefined}
-          locked={recorded}
-          readOnly
+          checked={tickPoints ? recorded : new Set<number>()}
+          onCheck={(i, on) => tick(i, on)}
+          locked={tickPoints ? undefined : recorded}
+          readOnly={!tickPoints}
           extra={byWho}
         />
         <TopicSessionLog courseId={course.id} topicId={topic.id} cover={topic.cover} traineeId={traineeId} />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-          {editable ? (
+          {editable && !(own && done) ? (
             <>
               <label className="subtle" htmlFor={`tr-${uidBase}`}>
                 Delivered by{' '}
